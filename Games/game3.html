@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Первые слова</title>
+    <style>
+        :root {
+            --gold: #f5c518;
+            --orange: #ff9800;
+            --bg-1: #0a0f1e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+        html, body {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            background: var(--bg-1);
+            font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+            color: #fff;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            padding: 16px 16px max(18px, env(safe-area-inset-bottom));
+            position: relative;
+            z-index: 10;
+        }
+        .game-header {
+            text-align: center;
+            margin-bottom: 12px;
+            z-index: 15;
+            width: 100%;
+            max-width: 420px;
+            padding: 0 54px;
+            flex-shrink: 0;
+        }
+        .game-title { font-size: clamp(22px, 5vw, 28px); color: var(--gold); font-weight: 800; line-height: 1.2; }
+        .game-desc { font-size: 16px; margin-top: 6px; min-height: 24px; font-weight: 700; letter-spacing: 0.5px; }
+        
+        .task-letter { display: inline-block; padding: 0 4px; font-weight: 900; font-size: 20px; }
+        .task-secret-slot { display: inline-block; width: 22px; height: 26px; border-bottom: 3px solid #fff; margin: 0 4px; vertical-align: middle; text-align: center; }
+
+        .audio-btn {
+            position: fixed;
+            top: 16px;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            font-size: 20px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateZ(0);
+            transition: transform 0.12s ease-out, opacity 0.2s, background 0.2s;
+        }
+        .audio-btn:active { transform: scale(0.92) translateZ(0); }
+        .audio-btn.off {
+            opacity: 0.45;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        #music-toggle-btn { left: 16px; }
+        #sfx-toggle-btn { right: 16px; }
+
+        .canvas-wrapper {
+            width: 100%;
+            max-width: 420px;
+            flex: 1 1 auto;
+            min-height: 260px;
+            background: #0d1428;
+            border: 2px solid rgba(245,197,24,0.35);
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            transform: translateZ(0);
+            touch-action: none;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: pointer;
+        }
+
+        #final-word-overlay {
+            position: absolute; inset: 0;
+            display: none; align-items: center; justify-content: center;
+            font-size: 72px; font-weight: 900; color: #ffffff;
+            letter-spacing: 6px;
+            pointer-events: none;
+            z-index: 20;
+            animation: rainbowGlow 1.2s linear infinite;
+        }
+        @keyframes rainbowGlow {
+            0% { color: #ff4a6a; transform: scale(0.95) translateZ(0); }
+            33% { color: #f5c518; transform: scale(1.05) translateZ(0); }
+            66% { color: #4a9eff; transform: scale(1.0) translateZ(0); }
+            100% { color: #ff4a6a; transform: scale(0.95) translateZ(0); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate3d(0, 0, 0); }
+            25% { transform: translate3d(-6px, 0, 0); }
+            75% { transform: translate3d(6px, 0, 0); }
+        }
+        .shake-anim {
+            animation: shake 0.28s ease;
+        }
+        
+        .game-footer {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 24px;
+            min-height: 108px;
+            flex-shrink: 0;
+        }
+        .progress-text { font-size: 15px; font-weight: 700; color: var(--orange); margin-bottom: 8px; }
+        .progress-dots { display: flex; gap: 8px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); transition: background 0.3s, border-color 0.3s; }
+        .dot.active { background: var(--gold); border-color: var(--gold); }
+
+        .win-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #f5c518, #ff9800);
+            color: #10172b; border: none; padding: 14px 30px; font-size: 16px;
+            font-weight: 900; font-family: inherit; border-radius: 50px; cursor: pointer;
+            transform: translateZ(0);
+            transition: transform 0.12s ease-out, background 0.15s ease-out;
+            min-width: 210px;
+        }
+        .btn:active { transform: scale(0.95) translateZ(0); }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 12px 26px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        .btn-secondary:active {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #start-screen {
+            position: absolute; inset: 0;
+            background: rgba(10, 15, 30, 0.94);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 90;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="music-toggle-btn" class="audio-btn" title="Включить/выключить фоновую музыку">🎵</button>
+    <button id="sfx-toggle-btn" class="audio-btn" title="Включить/выключить звуки эффектов">🔊</button>
+
+    <div class="game-container">
+        <div class="game-header">
+            <div class="game-title">Первые слова</div>
+            <div class="game-desc" id="status-instruction">Загрузка...</div>
+        </div>
+
+        <div class="canvas-wrapper" id="game-area">
+            <canvas id="game-canvas"></canvas>
+            <div id="final-word-overlay">ФОГ</div>
+        </div>
+
+        <div class="game-footer">
+            <div id="progress-block" style="display: flex; flex-direction: column; align-items: center;">
+                <div class="progress-text" id="word-progress-text">Этап: 1 / 5 (Раунд: 1 / 3)</div>
+                <div class="progress-dots">
+                    <div class="dot" id="dot-1"></div>
+                    <div class="dot" id="dot-2"></div>
+                    <div class="dot" id="dot-3"></div>
+                    <div class="dot" id="dot-4"></div>
+                    <div class="dot" id="dot-5"></div>
+                </div>
+            </div>
+
+            <div class="win-controls hidden" id="win-controls">
+                <button class="btn" id="next-btn">Дальше</button>
+                <button class="btn btn-secondary" id="restart-btn">Ещё разик</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <button class="btn" id="start-btn">Начать</button>
+    </div>
+
+    <script>
+        // =========================================================
+        // НАСТРОЙКА ГРОМКОСТИ ФОНОВОЙ МУЗЫКИ (от 0.0 до 1.0)
+        // =========================================================
+        const BG_MUSIC_VOLUME = 0.80;
+
+        const gameArea = document.getElementById('game-area');
+        const canvas = document.getElementById('game-canvas');
+        const ctx2d = canvas.getContext('2d');
+        const finalWordOverlay = document.getElementById('final-word-overlay');
+        const startScreen = document.getElementById('start-screen');
+        const progressBlock = document.getElementById('progress-block');
+        const winControls = document.getElementById('win-controls');
+        const musicToggleBtn = document.getElementById('music-toggle-btn');
+        const sfxToggleBtn = document.getElementById('sfx-toggle-btn');
+
+        let isGameStarted = false;
+        let isMusicEnabled = true;
+        let isSfxEnabled = true;
+
+        // =========================================================
+        // 1. ЗВУК ЧЕРЕЗ WEB AUDIO API + ФОНОВАЯ КОЛЫБЕЛЬНАЯ
+        // =========================================================
+        let audioCtx = null;
+
+        const bgMusic = new Audio('../sounds/bajushki-baju.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = BG_MUSIC_VOLUME;
+        bgMusic.preload = 'auto';
+
+        function startBgMusic() {
+            if (!isMusicEnabled) return;
+            try {
+                bgMusic.volume = BG_MUSIC_VOLUME;
+                if (bgMusic.paused) {
+                    bgMusic.play().catch(() => {});
+                }
+            } catch (e) {}
+        }
+
+        function stopBgMusic() {
+            try {
+                bgMusic.pause();
+            } catch (e) {}
+        }
+
+        musicToggleBtn.addEventListener('click', () => {
+            getReadyAudioContext();
+            isMusicEnabled = !isMusicEnabled;
+            if (isMusicEnabled) {
+                musicToggleBtn.classList.remove('off');
+                if (isGameStarted && !isFinalExplosion) {
+                    startBgMusic();
+                }
+            } else {
+                musicToggleBtn.classList.add('off');
+                stopBgMusic();
+            }
+        });
+
+        sfxToggleBtn.addEventListener('click', () => {
+            getReadyAudioContext();
+            isSfxEnabled = !isSfxEnabled;
+            if (isSfxEnabled) {
+                sfxToggleBtn.textContent = '🔊';
+                sfxToggleBtn.classList.remove('off');
+            } else {
+                sfxToggleBtn.textContent = '🔇';
+                sfxToggleBtn.classList.add('off');
+            }
+        });
+
+        function getReadyAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        function playSynthSound(type) {
+            if (!isSfxEnabled) return;
+            const ctx = getReadyAudioContext();
+            if (!ctx) return;
+
+            const startTone = () => {
+                const now = ctx.currentTime + 0.015;
+                if (type === 'click') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(980, now + 0.11);
+                    gain.gain.setValueAtTime(0.65, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.13);
+                } else if (type === 'fail') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.25);
+                    gain.gain.setValueAtTime(0.65, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.27);
+                } else if (type === 'win') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        const t = now + idx * 0.11;
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, t);
+                        gain.gain.setValueAtTime(0.65, t);
+                        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(t);
+                        osc.stop(t + 0.36);
+                    });
+                }
+            };
+
+            if (ctx.state === 'suspended') {
+                ctx.resume().then(startTone).catch(() => {});
+            } else {
+                startTone();
+            }
+        }
+
+        // =========================================================
+        // 2. КОНФИГУРАЦИЯ ИГРЫ, ПАЛИТРА И КЭШ СПРАЙТОВ ПУЗЫРЕЙ
+        // =========================================================
+        const gameStages = [
+            { label: "ДАЙ", steps: ["ДАЙ"], roundsNeeded: 3 },
+            { label: "МА-МА", steps: ["МА", "МА"], roundsNeeded: 3 },
+            { label: "ПА-ПА", steps: ["ПА", "ПА"], roundsNeeded: 3 },
+            { label: "БА-БА", steps: ["БА", "БА"], roundsNeeded: 3 },
+            { label: "SECRET", steps: ["Ф", "О", "Г"], roundsNeeded: 1 }
+        ];
+
+        const colorPalette = [0, 50, 120, 200, 290];
+        const globalSyllables = ["ДАЙ", "МА", "ПА", "БА", "ГУ", "ЛЯ", "Ф", "О", "Г", "Д", "М", "П"];
+
+        const hueStyles = {
+            0:   { inner: 'rgba(255, 225, 232, 0.9)', mid: 'rgba(255, 74, 106, 0.55)', outer: 'rgba(210, 30, 65, 0.94)', border: 'rgba(255, 140, 160, 0.85)', solid: '#ff4a6a' },
+            50:  { inner: 'rgba(255, 250, 220, 0.9)', mid: 'rgba(245, 197, 24, 0.55)', outer: 'rgba(200, 150, 0, 0.94)', border: 'rgba(255, 230, 120, 0.85)', solid: '#f5c518' },
+            120: { inner: 'rgba(225, 255, 230, 0.9)', mid: 'rgba(76, 217, 100, 0.55)', outer: 'rgba(30, 160, 60, 0.94)', border: 'rgba(140, 255, 160, 0.85)', solid: '#4cd964' },
+            200: { inner: 'rgba(225, 245, 255, 0.9)', mid: 'rgba(74, 158, 255, 0.55)', outer: 'rgba(25, 105, 210, 0.94)', border: 'rgba(140, 200, 255, 0.85)', solid: '#4a9eff' },
+            290: { inner: 'rgba(250, 230, 255, 0.9)', mid: 'rgba(215, 90, 255, 0.55)', outer: 'rgba(160, 40, 205, 0.94)', border: 'rgba(235, 150, 255, 0.85)', solid: '#d75aff' }
+        };
+
+        function getSafeHueStyle(hue) {
+            return hueStyles[hue] || hueStyles[0];
+        }
+
+        const spriteCache = {};
+        function getBubbleSprite(hue, text) {
+            const key = hue + '_' + text;
+            if (spriteCache[key]) return spriteCache[key];
+
+            const baseR = 48;
+            const pad = 4;
+            const size = (baseR + pad) * 2;
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = size;
+            offCanvas.height = size;
+            const octx = offCanvas.getContext('2d');
+
+            const cx = size / 2;
+            const cy = size / 2;
+            const styleObj = getSafeHueStyle(hue);
+
+            const grad = octx.createRadialGradient(
+                cx - baseR * 0.35, cy - baseR * 0.38, baseR * 0.1,
+                cx, cy, baseR
+            );
+            grad.addColorStop(0, styleObj.inner);
+            grad.addColorStop(0.45, styleObj.mid);
+            grad.addColorStop(1, styleObj.outer);
+
+            octx.beginPath();
+            octx.arc(cx, cy, baseR, 0, Math.PI * 2);
+            octx.fillStyle = grad;
+            octx.fill();
+
+            octx.lineWidth = 2.5;
+            octx.strokeStyle = styleObj.border;
+            octx.stroke();
+
+            octx.beginPath();
+            octx.arc(cx - baseR * 0.38, cy - baseR * 0.38, baseR * 0.22, 0, Math.PI * 2);
+            octx.fillStyle = 'rgba(255, 255, 255, 0.52)';
+            octx.fill();
+
+            octx.textAlign = 'center';
+            octx.textBaseline = 'middle';
+            octx.font = `900 ${Math.round(baseR * 0.56)}px -apple-system, BlinkMacSystemFont, Nunito, sans-serif`;
+            octx.fillStyle = '#ffffff';
+            octx.fillText(text, cx, cy + 1);
+
+            spriteCache[key] = offCanvas;
+            return offCanvas;
+        }
+
+        function prewarmSprites() {
+            for (let c = 0; c < colorPalette.length; c++) {
+                for (let s = 0; s < globalSyllables.length; s++) {
+                    getBubbleSprite(colorPalette[c], globalSyllables[s]);
+                }
+            }
+        }
+
+        let currentStageIndex = 0;
+        let currentRoundIndex = 0;
+        let currentStepIndex = 0;
+        let targetColors = [];
+
+        let areaW = 360;
+        let areaH = 480;
+        let dpr = 1;
+
+        function updateDimensions() {
+            const rect = gameArea.getBoundingClientRect();
+            const w = Math.round(rect.width);
+            const h = Math.round(rect.height);
+            if (w <= 0 || h <= 0) return;
+
+            areaW = w;
+            areaH = h;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            const targetWidth = Math.round(areaW * dpr);
+            const targetHeight = Math.round(areaH * dpr);
+
+            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+            }
+            ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => updateDimensions());
+            ro.observe(gameArea);
+        }
+        window.addEventListener('resize', updateDimensions);
+        window.addEventListener('orientationchange', () => setTimeout(updateDimensions, 120));
+
+        // =========================================================
+        // 3. ЗВЁЗДНЫЙ ФОН НА CANVAS
+        // =========================================================
+        const stars = [];
+        function initStars() {
+            stars.length = 0;
+            for (let i = 0; i < 24; i++) {
+                stars.push({
+                    x: Math.random() * areaW,
+                    y: Math.random() * areaH,
+                    r: Math.random() * 0.9 + 0.5,
+                    speed: Math.random() * 18 + 8
+                });
+            }
+        }
+
+        // =========================================================
+        // 4. ОБЪЕКТНЫЕ ПУЛЫ ДЛЯ ПУЗЫРЕЙ И ЧАСТИЦ (CANVAS)
+        // =========================================================
+        const BUBBLE_POOL_SIZE = 20;
+        const PARTICLE_POOL_SIZE = 90;
+
+        const bubblePool = [];
+        const particlePool = [];
+
+        let activeBubblesCount = 0;
+        let spawnAccumulator = 0;
+        let isFinalExplosion = false;
+        let lastFrameTime = performance.now();
+        let animationFrameId = null;
+
+        function initPools() {
+            for (let i = 0; i < BUBBLE_POOL_SIZE; i++) {
+                bubblePool.push({
+                    active: false,
+                    popped: false,
+                    baseX: 0,
+                    x: 0,
+                    y: 0,
+                    radius: 30,
+                    diameter: 60,
+                    speedY: 100,
+                    wobbleSpeed: 2,
+                    wobblePhase: 0,
+                    text: '',
+                    hue: 0,
+                    sprite: null
+                });
+            }
+
+            for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+                particlePool.push({
+                    active: false,
+                    x: 0,
+                    y: 0,
+                    vx: 0,
+                    vy: 0,
+                    r: 3,
+                    color: '#ffffff',
+                    life: 0,
+                    decay: 1.5
+                });
+            }
+        }
+
+        function releaseBubble(b) {
+            if (!b.active) return;
+            b.active = false;
+            b.popped = false;
+            activeBubblesCount = Math.max(0, activeBubblesCount - 1);
+        }
+
+        function spawnBubble() {
+            const stage = gameStages[currentStageIndex];
+            if (!stage) return;
+
+            let b = null;
+            for (let i = 0; i < BUBBLE_POOL_SIZE; i++) {
+                if (!bubblePool[i].active) {
+                    b = bubblePool[i];
+                    break;
+                }
+            }
+            if (!b) return;
+
+            const neededPart = stage.steps[currentStepIndex];
+            const radius = Math.round(Math.random() * 22 + 25);
+            const diameter = radius * 2;
+            const x = Math.random() * Math.max(10, areaW - diameter);
+            const y = areaH + radius + Math.random() * 25;
+            let speedY = Math.random() * 65 + 105;
+            const wobbleSpeed = Math.random() * 2.2 + 1.4;
+            const wobblePhase = Math.random() * 100;
+
+            let text = '';
+            let hue = 0;
+
+            if (Math.random() < 0.38) {
+                text = neededPart;
+                hue = targetColors[currentStepIndex] !== undefined ? targetColors[currentStepIndex] : 0;
+                if (stage.label === "SECRET") {
+                    speedY = Math.random() * 80 + 145;
+                }
+            } else {
+                text = globalSyllables[Math.floor(Math.random() * globalSyllables.length)];
+                hue = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                if (text === neededPart && hue === targetColors[currentStepIndex]) {
+                    const currentIdx = colorPalette.indexOf(hue);
+                    hue = colorPalette[(currentIdx + 1) % colorPalette.length];
+                }
+            }
+
+            b.active = true;
+            b.popped = false;
+            b.baseX = x;
+            b.x = x;
+            b.y = y;
+            b.radius = radius;
+            b.diameter = diameter;
+            b.speedY = speedY;
+            b.wobbleSpeed = wobbleSpeed;
+            b.wobblePhase = wobblePhase;
+            b.text = text;
+            b.hue = hue;
+            b.sprite = getBubbleSprite(hue, text);
+
+            activeBubblesCount++;
+        }
+
+        function spawnParticles(cx, cy, hue, count = 10) {
+            const styleObj = getSafeHueStyle(hue);
+            let spawned = 0;
+
+            for (let i = 0; i < PARTICLE_POOL_SIZE && spawned < count; i++) {
+                const p = particlePool[i];
+                if (p.active) continue;
+
+                const pColor = hue === 'random'
+                    ? getSafeHueStyle(colorPalette[Math.floor(Math.random() * colorPalette.length)]).solid
+                    : styleObj.solid;
+
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 190 + 60;
+
+                p.active = true;
+                p.x = cx;
+                p.y = cy;
+                p.vx = Math.cos(angle) * speed;
+                p.vy = Math.sin(angle) * speed;
+                p.r = Math.random() * 2.5 + 2;
+                p.color = pColor;
+                p.life = 1.0;
+                p.decay = Math.random() * 1.4 + 1.1;
+
+                spawned++;
+            }
+        }
+
+        function popBubble(b) {
+            const cx = b.x + b.radius;
+            const cy = b.y + b.radius;
+            spawnParticles(cx, cy, b.hue, 10);
+            releaseBubble(b);
+            verifyBubbleMatch(b.text, b.hue);
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            getReadyAudioContext();
+            if (!isGameStarted || isFinalExplosion) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const touchX = e.clientX - rect.left;
+            const touchY = e.clientY - rect.top;
+
+            for (let i = BUBBLE_POOL_SIZE - 1; i >= 0; i--) {
+                const b = bubblePool[i];
+                if (!b.active || b.popped) continue;
+
+                const cx = b.x + b.radius;
+                const cy = b.y + b.radius;
+                const dx = touchX - cx;
+                const dy = touchY - cy;
+                const hitRadius = b.radius + 8;
+
+                if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+                    b.popped = true;
+                    popBubble(b);
+                    break;
+                }
+            }
+        });
+
+        // =========================================================
+        // 5. ПРОВЕРКА СОВПАДЕНИЯ, ПРОГРЕССА И ПЕРЕЗАПУСК
+        // =========================================================
+        function generateStageColors() {
+            targetColors = [];
+            const stage = gameStages[currentStageIndex];
+            let availableHues = [...colorPalette];
+
+            for (let i = 0; i < stage.steps.length; i++) {
+                if (availableHues.length === 0) availableHues = [...colorPalette];
+                const randIdx = Math.floor(Math.random() * availableHues.length);
+                targetColors.push(availableHues.splice(randIdx, 1)[0]);
+            }
+        }
+
+        function updateGameUI() {
+            const stage = gameStages[currentStageIndex];
+            const instructionEl = document.getElementById('status-instruction');
+
+            if (stage.label === "SECRET") {
+                let html = `Любимое слово! `;
+                for (let i = 0; i < stage.steps.length; i++) {
+                    const colorHex = `hsl(${targetColors[i]}, 100%, 60%)`;
+                    if (i < currentStepIndex) {
+                        html += `<span class="task-letter" style="color:${colorHex}">${stage.steps[i]}</span>`;
+                    } else if (i === currentStepIndex) {
+                        html += `<span class="task-secret-slot" style="border-color:${colorHex}; color:${colorHex}; font-weight:bold; font-size:18px;">?</span>`;
+                    } else {
+                        html += `<span class="task-secret-slot" style="border-color:rgba(255,255,255,0.2)"></span>`;
+                    }
+                }
+                instructionEl.innerHTML = html;
+            } else {
+                let html = `Собери слово: `;
+                for (let i = 0; i < stage.steps.length; i++) {
+                    const colorHex = `hsl(${targetColors[i]}, 100%, 60%)`;
+                    const opacity = i === currentStepIndex ? 1 : (i < currentStepIndex ? 0.45 : 0.25);
+                    html += `<span class="task-letter" style="color:${colorHex}; opacity:${opacity}">${stage.steps[i]}</span>`;
+                    if (i < stage.steps.length - 1 && stage.label.includes("-")) html += "-";
+                }
+                instructionEl.innerHTML = html;
+            }
+
+            const roundText = stage.label === "SECRET" ? "ФИНАЛ" : `Раунд: ${currentRoundIndex + 1} / ${stage.roundsNeeded}`;
+            document.getElementById('word-progress-text').innerText = `Этап: ${currentStageIndex + 1} / 5 (${roundText})`;
+        }
+
+        function verifyBubbleMatch(clickedText, clickedHue) {
+            const stage = gameStages[currentStageIndex];
+            const neededText = stage.steps[currentStepIndex];
+            const neededHue = targetColors[currentStepIndex];
+
+            if (clickedText === neededText && clickedHue === neededHue) {
+                playSynthSound('click');
+                currentStepIndex++;
+
+                if (currentStepIndex >= stage.steps.length) {
+                    currentStepIndex = 0;
+                    currentRoundIndex++;
+
+                    if (currentRoundIndex >= stage.roundsNeeded) {
+                        currentRoundIndex = 0;
+                        currentStageIndex++;
+
+                        const dot = document.getElementById('dot-' + currentStageIndex);
+                        if (dot) dot.classList.add('active');
+
+                        if (currentStageIndex >= gameStages.length) {
+                            triggerFinalExplosion();
+                            return;
+                        }
+                    }
+                    generateStageColors();
+                }
+                updateGameUI();
+            } else {
+                playSynthSound('fail');
+                currentStepIndex = 0;
+                updateGameUI();
+
+                gameArea.classList.remove('shake-anim');
+                void gameArea.offsetWidth;
+                gameArea.classList.add('shake-anim');
+            }
+        }
+
+        function triggerFinalExplosion() {
+            if (isFinalExplosion) return;
+            isFinalExplosion = true;
+
+            stopBgMusic();
+            playSynthSound('win');
+
+            for (let i = 0; i < BUBBLE_POOL_SIZE; i++) {
+                const b = bubblePool[i];
+                if (b.active) {
+                    spawnParticles(b.x + b.radius, b.y + b.radius, b.hue, 8);
+                    releaseBubble(b);
+                }
+            }
+
+            spawnParticles(areaW / 2, areaH / 2, 'random', 55);
+
+            document.getElementById('status-instruction').innerHTML = `Любимое слово раскрыто! 🔥`;
+            finalWordOverlay.style.display = 'flex';
+            localStorage.setItem('arinaJustPassedGame', 'true');
+
+            progressBlock.classList.add('hidden');
+            winControls.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            currentStageIndex = 0;
+            currentRoundIndex = 0;
+            currentStepIndex = 0;
+            isFinalExplosion = false;
+            spawnAccumulator = 0;
+
+            for (let i = 0; i < BUBBLE_POOL_SIZE; i++) {
+                releaseBubble(bubblePool[i]);
+            }
+            for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+                particlePool[i].active = false;
+            }
+            for (let i = 1; i <= 5; i++) {
+                const dot = document.getElementById('dot-' + i);
+                if (dot) dot.classList.remove('active');
+            }
+
+            finalWordOverlay.style.display = 'none';
+            winControls.classList.add('hidden');
+            progressBlock.classList.remove('hidden');
+
+            generateStageColors();
+            updateGameUI();
+            startBgMusic();
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            getReadyAudioContext();
+            isGameStarted = true;
+            startScreen.style.display = 'none';
+            updateDimensions();
+            initStars();
+            startBgMusic();
+        });
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+            getReadyAudioContext();
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: "QUEST_WIN" }, "*");
+            } else {
+                window.location.href = 'index13.html';
+            }
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            getReadyAudioContext();
+            resetGame();
+        });
+
+        // =========================================================
+        // 6. ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ (60 FPS НА СВЕРХБЫСТРЫХ СПРАЙТАХ)
+        // =========================================================
+        function gameLoop(now) {
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+            lastFrameTime = now;
+
+            ctx2d.fillStyle = '#0d1428';
+            ctx2d.fillRect(0, 0, areaW, areaH);
+
+            ctx2d.fillStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx2d.beginPath();
+            for (let i = 0; i < stars.length; i++) {
+                const s = stars[i];
+                s.y -= s.speed * dt;
+                if (s.y < -4) {
+                    s.y = areaH + 4;
+                    s.x = Math.random() * areaW;
+                }
+                ctx2d.moveTo(s.x + s.r, s.y);
+                ctx2d.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            }
+            ctx2d.fill();
+
+            if (isGameStarted && !isFinalExplosion) {
+                spawnAccumulator += dt;
+                if (spawnAccumulator >= 0.32) {
+                    spawnAccumulator = 0;
+                    if (activeBubblesCount < 16) {
+                        spawnBubble();
+                    }
+                }
+
+                for (let i = 0; i < BUBBLE_POOL_SIZE; i++) {
+                    const b = bubblePool[i];
+                    if (!b.active) continue;
+
+                    b.y -= b.speedY * dt;
+                    b.wobblePhase += b.wobbleSpeed * dt;
+                    b.x = b.baseX + Math.sin(b.wobblePhase) * 10;
+
+                    if (b.y < -b.diameter - 10) {
+                        releaseBubble(b);
+                        continue;
+                    }
+
+                    const drawPad = b.radius * (4 / 48);
+                    ctx2d.drawImage(
+                        b.sprite,
+                        b.x - drawPad,
+                        b.y - drawPad,
+                        b.diameter + drawPad * 2,
+                        b.diameter + drawPad * 2
+                    );
+                }
+            }
+
+            for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+                const p = particlePool[i];
+                if (!p.active) continue;
+
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.vy += 220 * dt;
+                p.life -= p.decay * dt;
+
+                if (p.life <= 0) {
+                    p.active = false;
+                } else {
+                    ctx2d.globalAlpha = p.life;
+                    ctx2d.fillStyle = p.color;
+                    ctx2d.beginPath();
+                    ctx2d.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx2d.fill();
+                }
+            }
+            ctx2d.globalAlpha = 1;
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Старт
+        prewarmSprites();
+        initPools();
+        generateStageColors();
+        updateGameUI();
+        requestAnimationFrame(() => {
+            updateDimensions();
+            initStars();
+            lastFrameTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        });
+    </script>
+</body>
+</html>

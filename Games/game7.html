@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Игра 7 (5 Букв)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1e1e2f, #0f0f1a);
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+    padding: 10px;
+  }
+
+  .header {
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 900;
+    color: #f5c518;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .top-btn {
+    position: absolute;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-weight: 900;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.1s;
+  }
+  .top-btn:active { transform: scale(0.9) translateZ(0); background: rgba(255,255,255,0.2); }
+  .mute-btn { left: 0; }
+  .help-btn { right: 0; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 15, 0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .modal-overlay.active { opacity: 1; pointer-events: auto; }
+  .modal-content {
+    background: #1e1e2f;
+    border: 1px solid rgba(245, 197, 24, 0.35);
+    border-radius: 16px;
+    padding: 22px;
+    width: 90%;
+    max-width: 320px;
+    transform: scale(0.95) translateZ(0);
+    transition: transform 0.25s;
+    text-align: left;
+  }
+  .modal-overlay.active .modal-content { transform: scale(1) translateZ(0); }
+  .modal-content h3 { color: #f5c518; font-size: 20px; margin-bottom: 10px; text-align: center; }
+  .modal-content p { font-size: 14px; color: #b8c0d0; margin-bottom: 14px; text-align: center; }
+
+  .word-hint-box {
+    background: rgba(245, 197, 24, 0.12);
+    border: 1px solid rgba(245, 197, 24, 0.35);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #fff5b8;
+    text-align: center;
+  }
+
+  .rule-item { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 14px; font-weight: 700; }
+  .color-box { width: 24px; height: 24px; border-radius: 4px; flex-shrink: 0; }
+  .color-box.yellow { background: #f5c518; }
+  .color-box.white { background: #ffffff; }
+  .color-box.grey { background: #3a3a3c; }
+
+  .close-modal-btn {
+    display: block;
+    width: 100%;
+    background: linear-gradient(135deg, #f5c518, #ff9800);
+    color: #10172b;
+    border: none;
+    padding: 12px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 900;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+
+  #toast {
+    position: fixed;
+    top: 14%;
+    left: 50%;
+    transform: translate3d(-50%, 0, 0);
+    background: #fff;
+    color: #10172b;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 900;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+    z-index: 150;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+
+  #board-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    max-width: 320px;
+    min-height: 0;
+    margin: 8px 0;
+  }
+
+  #board {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 5px;
+    width: 100%;
+    height: 100%;
+    max-height: 340px;
+  }
+  .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .cell {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(22px, 6.5vh, 32px);
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #fff;
+    transform: translateZ(0);
+    transition: transform 0.3s, background-color 0.25s, border-color 0.25s;
+  }
+  .cell.filled { border-color: rgba(255, 255, 255, 0.45); }
+  .cell.hint-cell {
+    background: rgba(245, 197, 24, 0.22);
+    border-color: #f5c518;
+    color: #f5c518;
+  }
+
+  .shake { animation: shake 0.35s ease-in-out both; }
+  @keyframes shake {
+    10%, 90% { transform: translate3d(-3px, 0, 0); }
+    20%, 80% { transform: translate3d(5px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+    40%, 60% { transform: translate3d(5px, 0, 0); }
+  }
+
+  .cell.correct { background: #f5c518; border-color: #f5c518; color: #10172b; }
+  .cell.present { background: #ffffff; border-color: #ffffff; color: #10172b; }
+  .cell.absent  { background: #3a3a3c; border-color: #3a3a3c; color: #fff; }
+
+  .cell.glow {
+    border-color: #fff6b3;
+    z-index: 10;
+  }
+  .cell.wave { animation: popWave 0.55s ease-in-out forwards; }
+  @keyframes popWave {
+    0% { transform: scale(1) translateZ(0); }
+    40% { transform: scale(1.15) translateZ(0); }
+    100% { transform: scale(1) translateZ(0); }
+  }
+  .cell.scale-burst { animation: triplePulse 0.55s ease-in-out 3 forwards; }
+  @keyframes triplePulse {
+    0%, 100% { transform: scale(1) translateZ(0); }
+    50% { transform: scale(1.25) translateZ(0); }
+  }
+
+  .hint-wrapper { flex-shrink: 0; margin-bottom: 6px; }
+  #hint-btn {
+    background: rgba(245, 197, 24, 0.14);
+    color: #f5c518;
+    border: 1px solid rgba(245, 197, 24, 0.45);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-family: inherit;
+    font-weight: 900;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transform: translateZ(0);
+    transition: transform 0.1s;
+  }
+  #hint-btn:active { transform: scale(0.95) translateZ(0); background: rgba(245, 197, 24, 0.28); }
+  #hint-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+  #keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    max-width: 500px;
+    flex-shrink: 0;
+    padding-bottom: 4px;
+    touch-action: manipulation;
+  }
+  .kb-row { display: flex; justify-content: center; gap: 4px; width: 100%; }
+  .kb-key {
+    background: #2a2a3a;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    height: clamp(38px, 6vh, 48px);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    font-size: clamp(14px, 2.5vh, 16px);
+    font-weight: 900;
+    text-transform: uppercase;
+    cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.08s;
+    touch-action: manipulation;
+  }
+  .kb-key:active { transform: scale(0.92) translateZ(0); }
+  .kb-key.wide { flex: 1.5; font-size: 12px; }
+  .kb-key.enter { background: #4caf50 !important; color: #fff !important; }
+  .kb-key.backspace { background: #f5c518 !important; color: #10172b !important; }
+
+  .kb-key.correct { background: #f5c518; color: #10172b; }
+  .kb-key.present { background: #ffffff; color: #10172b; }
+  .kb-key.absent  { background: #1a1a24; color: #555; }
+
+  .screen-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 30, 0.96);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 120;
+    text-align: center;
+    padding: 22px;
+  }
+  .screen-overlay.active { display: flex; }
+  #start-screen { display: flex; z-index: 300; }
+
+  .screen-overlay h3 { color: #f5c518; font-size: 28px; margin-bottom: 14px; z-index: 10; }
+  .screen-overlay p { font-size: 16px; margin-bottom: 22px; line-height: 1.5; max-width: 320px; color: #fff; z-index: 10; }
+
+  .win-photo {
+    width: min(56vw, 190px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #f5c518;
+    margin-bottom: 18px;
+    z-index: 10;
+  }
+
+  .revealed-word {
+    display: inline-block;
+    background: rgba(245, 197, 24, 0.16);
+    border: 2px solid #f5c518;
+    color: #f5c518;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    padding: 8px 22px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    z-index: 10;
+  }
+
+  .btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 250px;
+    z-index: 10;
+  }
+
+  .btn-main {
+    background: linear-gradient(135deg, #ffe066 0%, #f5c518 50%, #ff9800 100%);
+    color: #10172b;
+    border: 2px solid #fff5b8;
+    padding: 14px 28px;
+    font-size: 16px;
+    font-weight: 900;
+    font-family: inherit;
+    border-radius: 50px;
+    cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.12s;
+  }
+  .btn-main:active { transform: scale(0.95) translateZ(0); }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 2px solid rgba(245, 197, 24, 0.5);
+    padding: 12px 28px;
+    font-size: 15px;
+    font-weight: 900;
+    font-family: inherit;
+    border-radius: 50px;
+    cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.12s;
+  }
+  .btn-secondary:active { transform: scale(0.95) translateZ(0); }
+
+  #fireworks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+  .firework-particle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(-9999px, -9999px, 0);
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <button class="top-btn mute-btn" id="mute-btn" title="Звук">🔊</button>
+    <h2>5 Букв</h2>
+    <button class="top-btn help-btn" id="help-btn" title="Правила">?</button>
+  </div>
+
+  <div class="modal-overlay" id="rules-modal">
+    <div class="modal-content" id="rules-content">
+      <h3>Как играть?</h3>
+      <p>Угадай слово из 5 букв за 6 попыток.</p>
+      <div class="word-hint-box">
+        💡 <b>Намёк к этому слову:</b><br><span id="current-word-hint">Им выражают чувства</span>
+      </div>
+      <div class="rule-item">
+        <div class="color-box yellow"></div>
+        <span>Буква на своём месте</span>
+      </div>
+      <div class="rule-item">
+        <div class="color-box white"></div>
+        <span>Буква есть, но в другом месте</span>
+      </div>
+      <div class="rule-item">
+        <div class="color-box grey"></div>
+        <span>Такой буквы нет в слове</span>
+      </div>
+      <button class="close-modal-btn" id="close-rules-btn">Понятно</button>
+    </div>
+  </div>
+
+  <div id="toast">Сообщение</div>
+
+  <div id="board-container">
+    <div id="board"></div>
+  </div>
+
+  <div class="hint-wrapper">
+    <button id="hint-btn">💡 Открыть 1 букву</button>
+  </div>
+
+  <div id="keyboard">
+    <div class="kb-row">
+      <button class="kb-key" data-key="Й">Й</button><button class="kb-key" data-key="Ц">Ц</button>
+      <button class="kb-key" data-key="У">У</button><button class="kb-key" data-key="К">К</button>
+      <button class="kb-key" data-key="Е">Е</button><button class="kb-key" data-key="Н">Н</button>
+      <button class="kb-key" data-key="Г">Г</button><button class="kb-key" data-key="Ш">Ш</button>
+      <button class="kb-key" data-key="Щ">Щ</button><button class="kb-key" data-key="З">З</button>
+      <button class="kb-key" data-key="Х">Х</button><button class="kb-key" data-key="Ъ">Ъ</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-key="Ф">Ф</button><button class="kb-key" data-key="Ы">Ы</button>
+      <button class="kb-key" data-key="В">В</button><button class="kb-key" data-key="А">А</button>
+      <button class="kb-key" data-key="П">П</button><button class="kb-key" data-key="Р">Р</button>
+      <button class="kb-key" data-key="О">О</button><button class="kb-key" data-key="Л">Л</button>
+      <button class="kb-key" data-key="Д">Д</button><button class="kb-key" data-key="Ж">Ж</button>
+      <button class="kb-key" data-key="Э">Э</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key wide enter" data-key="ENTER">ВВОД</button>
+      <button class="kb-key" data-key="Я">Я</button><button class="kb-key" data-key="Ч">Ч</button>
+      <button class="kb-key" data-key="С">С</button><button class="kb-key" data-key="М">М</button>
+      <button class="kb-key" data-key="И">И</button><button class="kb-key" data-key="Т">Т</button>
+      <button class="kb-key" data-key="Ь">Ь</button><button class="kb-key" data-key="Б">Б</button>
+      <button class="kb-key" data-key="Ю">Ю</button>
+      <button class="kb-key wide backspace" data-key="BACKSPACE">⌫</button>
+    </div>
+  </div>
+
+  <!-- Стартовый экран -->
+  <div class="screen-overlay" id="start-screen">
+    <h3>5 Букв</h3>
+    <p>Угадай загаданное слово из 5 букв за 6 попыток!</p>
+    <button class="btn-main" id="start-btn">Начать</button>
+  </div>
+
+  <!-- Экран победы -->
+  <div class="screen-overlay" id="win-screen">
+    <div id="fireworks"></div>
+    <h3>Слово разгадано! 🎉</h3>
+    <img class="win-photo" src="../photos/photo7_1.jpg" alt="Год 7" onerror="this.style.display='none'">
+    <p>Ты готовилась к школе и училась читать. Ты очень умная девочка! С праздником!</p>
+    <div class="btn-group">
+      <button class="btn-main" id="win-next-btn">Дальше</button>
+      <button class="btn-secondary" id="win-more-btn">Ещё слово?</button>
+    </div>
+  </div>
+
+  <!-- Экран проигрыша -->
+  <div class="screen-overlay" id="lose-screen">
+    <h3 style="color: #ff4a6a;">Попытки закончились</h3>
+    <p style="margin-bottom: 10px;">Было загадано слово:</p>
+    <div class="revealed-word" id="revealed-word-box">СЛОВО</div>
+    <div class="btn-group">
+      <button class="btn-main" id="lose-more-btn">Ещё слово?</button>
+    </div>
+  </div>
+
+  <script>
+    const WORDS_DATA = [
+      { word: 'БУКЕТ', hint: 'Дарят на праздники' },
+      { word: 'ШКОЛА', hint: 'Место новых открытий' },
+      { word: 'ДОЧКА', hint: 'Самая родная и любимая' },
+      { word: 'КНИГА', hint: 'Не говорит, но рассказывает' },
+      { word: 'РУЧКА', hint: 'Оставляет след за собой' },
+      { word: 'АРИНА', hint: 'Имя моей дочери' },
+      { word: 'СВЕЧА', hint: 'Разгоняет тьму' },
+      { word: 'ШАРИК', hint: 'Поднимает настроение' },
+      { word: 'ПЕСНЯ', hint: 'Слияние слов и музыки' }
+    ];
+
+    let currentWordIndex = 0;
+    let targetWord = WORDS_DATA[currentWordIndex].word;
+
+    let currentRow = 0;
+    let rowLetters = ['', '', '', '', ''];
+    let lockedHintPositions = [false, false, false, false, false];
+    let guessedPositions = [false, false, false, false, false];
+    let isGameOver = false;
+    let hintUsed = false;
+    let isProcessing = false;
+    let isMuted = false;
+    let sessionId = 0;
+
+    const boardEl = document.getElementById('board');
+    const winScreen = document.getElementById('win-screen');
+    const loseScreen = document.getElementById('lose-screen');
+    const startScreen = document.getElementById('start-screen');
+    const hintBtn = document.getElementById('hint-btn');
+    const toastEl = document.getElementById('toast');
+    const muteBtn = document.getElementById('mute-btn');
+    const rulesModal = document.getElementById('rules-modal');
+    const currentWordHintEl = document.getElementById('current-word-hint');
+
+    const cellGrid = [];
+    const kbMap = {};
+    let toastTimeout = null;
+
+    document.querySelectorAll('.kb-key').forEach(btn => {
+      kbMap[btn.dataset.key] = btn;
+    });
+
+    // =========================================================
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/ + СИНТЕЗ АКЦЕНТОВ)
+    // =========================================================
+    const SOUND_URLS = {
+      click: '../sounds/clicboard.mp3',
+      win1: '../sounds/win1.mp3',
+      win4: '../sounds/win4.mp3',
+      absent: '../sounds/krestik2.mp3',
+      win3: '../sounds/win3.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const soundBuffers = {};
+    const htmlAudioPool = {};
+    const isLocalFile = window.location.protocol === 'file:';
+    let audioUnlocked = false;
+    let activeWinAudio = null;
+
+    Object.keys(SOUND_URLS).forEach(key => {
+      const a = new Audio(SOUND_URLS[key]);
+      a.preload = 'auto';
+      htmlAudioPool[key] = a;
+    });
+
+    async function loadSoundBuffer(key, url) {
+      if (!audioCtx || isLocalFile) return;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = await res.arrayBuffer();
+        soundBuffers[key] = await audioCtx.decodeAudioData(buf);
+      } catch (e) {
+        soundBuffers[key] = null;
+      }
+    }
+
+    Object.keys(SOUND_URLS).forEach(k => loadSoundBuffer(k, SOUND_URLS[k]));
+
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      if (audioCtx) {
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        try {
+          const b = audioCtx.createBuffer(1, 1, 22050);
+          const s = audioCtx.createBufferSource();
+          s.buffer = b;
+          s.connect(audioCtx.destination);
+          s.start(0);
+        } catch (e) {}
+      }
+    }
+
+    function playSound(key, volume = 0.6, rate = 1.0) {
+      if (isMuted) return;
+      const buffer = soundBuffers[key];
+
+      if (audioCtx && buffer && !isLocalFile) {
+        const startBuf = () => {
+          try {
+            const src = audioCtx.createBufferSource();
+            const gain = audioCtx.createGain();
+            gain.gain.value = volume;
+            src.playbackRate.value = rate;
+            src.buffer = buffer;
+            src.connect(gain);
+            gain.connect(audioCtx.destination);
+            src.start(0);
+            if (key === 'win3') activeWinAudio = src;
+          } catch (e) {
+            playHtmlFallback(key, volume, rate);
+          }
+        };
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(startBuf).catch(() => playHtmlFallback(key, volume, rate));
+        } else {
+          startBuf();
+        }
+      } else {
+        playHtmlFallback(key, volume, rate);
+      }
+    }
+
+    function playHtmlFallback(key, volume, rate) {
+      const a = htmlAudioPool[key];
+      if (!a) return;
+      try {
+        a.pause();
+        a.currentTime = 0;
+        a.volume = volume;
+        a.playbackRate = rate;
+        a.muted = isMuted;
+        a.play().catch(() => {});
+        if (key === 'win3') activeWinAudio = a;
+      } catch (e) {}
+    }
+
+    function stopWinSound() {
+      if (activeWinAudio) {
+        try {
+          if (typeof activeWinAudio.stop === 'function') activeWinAudio.stop();
+          else if (typeof activeWinAudio.pause === 'function') {
+            activeWinAudio.pause();
+            activeWinAudio.currentTime = 0;
+          }
+        } catch (e) {}
+        activeWinAudio = null;
+      }
+    }
+
+    function playTone(freq, type, dur, vol = 0.14, slideTo = null) {
+      if (!audioCtx || isMuted) return;
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        const now = audioCtx.currentTime + 0.01;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + dur);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + dur + 0.02);
+      } catch (e) {}
+    }
+
+    function soundDelete() { playTone(320, 'sine', 0.08, 0.1, 210); }
+    function soundHint() {
+      playTone(660, 'sine', 0.12, 0.14);
+      setTimeout(() => playTone(990, 'sine', 0.18, 0.14), 80);
+    }
+    function soundError() { playTone(190, 'triangle', 0.18, 0.15, 130); }
+    function soundLose() {
+      playTone(330, 'triangle', 0.22, 0.15);
+      setTimeout(() => playTone(260, 'triangle', 0.25, 0.15), 200);
+      setTimeout(() => playTone(196, 'triangle', 0.4, 0.16), 420);
+    }
+
+    function triggerHaptic(pattern) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+      }
+    }
+
+    // =========================================================
+    // ИНИЦИАЛИЗАЦИЯ ПОЛЯ (ОДИН РАЗ БЕЗ ПЕРЕСОЗДАНИЯ DOM)
+    // =========================================================
+    function buildBoardOnce() {
+      boardEl.innerHTML = '';
+      cellGrid.length = 0;
+      const frag = document.createDocumentFragment();
+      for (let r = 0; r < 6; r++) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const rowCells = [];
+        for (let c = 0; c < 5; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          row.appendChild(cell);
+          rowCells.push(cell);
+        }
+        cellGrid.push(rowCells);
+        frag.appendChild(row);
+      }
+      boardEl.appendChild(frag);
+    }
+
+    function initGame() {
+      sessionId++;
+      stopWinSound();
+      stopFireworks();
+
+      winScreen.classList.remove('active');
+      loseScreen.classList.remove('active');
+
+      const currentEntry = WORDS_DATA[currentWordIndex];
+      targetWord = currentEntry.word;
+      currentWordHintEl.textContent = currentEntry.hint;
+
+      currentRow = 0;
+      rowLetters = ['', '', '', '', ''];
+      lockedHintPositions = [false, false, false, false, false];
+      guessedPositions = [false, false, false, false, false];
+      isGameOver = false;
+      isProcessing = false;
+      hintUsed = false;
+
+      hintBtn.disabled = false;
+
+      for (let r = 0; r < 6; r++) {
+        const rowEl = boardEl.children[r];
+        if (rowEl) rowEl.classList.remove('shake');
+        for (let c = 0; c < 5; c++) {
+          const cell = cellGrid[r][c];
+          cell.textContent = '';
+          cell.className = 'cell';
+        }
+      }
+
+      Object.values(kbMap).forEach(k => {
+        k.classList.remove('correct', 'present', 'absent');
+      });
+    }
+
+    function showToast(msg) {
+      clearTimeout(toastTimeout);
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 1800);
+    }
+
+    // =========================================================
+    // ВВОД БУКВ И УДАЛЕНИЕ (С ЗАЩИТОЙ БУКВЫ ИЗ ПОДСКАЗКИ)
+    // =========================================================
+    function handleKey(key) {
+      if (isGameOver || isProcessing || startScreen.style.display !== 'none') return;
+
+      if (key === 'BACKSPACE') {
+        let lastDeletableIdx = -1;
+        for (let i = 4; i >= 0; i--) {
+          if (rowLetters[i] !== '' && !lockedHintPositions[i]) {
+            lastDeletableIdx = i;
+            break;
+          }
+        }
+        if (lastDeletableIdx !== -1) {
+          rowLetters[lastDeletableIdx] = '';
+          const cell = cellGrid[currentRow][lastDeletableIdx];
+          cell.textContent = '';
+          cell.classList.remove('filled', 'hint-cell');
+          soundDelete();
+          triggerHaptic(12);
+        }
+      } else if (key === 'ENTER') {
+        if (rowLetters.every(ch => ch !== '')) {
+          playSound('click', 0.5);
+          checkWord();
+        } else {
+          const row = boardEl.children[currentRow];
+          row.classList.remove('shake');
+          void row.offsetWidth;
+          row.classList.add('shake');
+          soundError();
+          triggerHaptic([30, 40, 30]);
+          showToast('Заполни все 5 букв!');
+        }
+      } else {
+        let firstEmptyIdx = -1;
+        for (let i = 0; i < 5; i++) {
+          if (rowLetters[i] === '') {
+            firstEmptyIdx = i;
+            break;
+          }
+        }
+        if (firstEmptyIdx !== -1) {
+          rowLetters[firstEmptyIdx] = key;
+          const cell = cellGrid[currentRow][firstEmptyIdx];
+          cell.textContent = key;
+          cell.classList.add('filled');
+          playSound('click', 0.45);
+          triggerHaptic(15);
+        }
+      }
+    }
+
+    // =========================================================
+    // УМНАЯ ПОДСКАЗКА (ТОЛЬКО ЕЩЁ НЕ ИЗВЕСТНАЯ БУКВА)
+    // =========================================================
+    function useHint() {
+      if (hintUsed || isGameOver || isProcessing) return;
+
+      const knownLetters = new Set();
+      Object.keys(kbMap).forEach(letter => {
+        const btn = kbMap[letter];
+        if (btn.classList.contains('correct') || btn.classList.contains('present')) {
+          knownLetters.add(letter);
+        }
+      });
+
+      let availableIndices = [];
+      for (let i = 0; i < 5; i++) {
+        const targetChar = targetWord[i];
+        if (!guessedPositions[i] && !lockedHintPositions[i] && !knownLetters.has(targetChar)) {
+          availableIndices.push(i);
+        }
+      }
+
+      if (availableIndices.length === 0) {
+        for (let i = 0; i < 5; i++) {
+          if (!guessedPositions[i] && !lockedHintPositions[i] && rowLetters[i] !== targetWord[i]) {
+            availableIndices.push(i);
+          }
+        }
+      }
+
+      if (availableIndices.length === 0) {
+        showToast('Все буквы уже известны!');
+        return;
+      }
+
+      const randIdx = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      const revealedLetter = targetWord[randIdx];
+
+      rowLetters[randIdx] = revealedLetter;
+      guessedPositions[randIdx] = true;
+      lockedHintPositions[randIdx] = true;
+
+      const cell = cellGrid[currentRow][randIdx];
+      cell.textContent = revealedLetter;
+      cell.classList.add('filled', 'hint-cell');
+
+      const kbKey = kbMap[revealedLetter];
+      if (kbKey) {
+        kbKey.classList.remove('present', 'absent');
+        kbKey.classList.add('correct');
+      }
+
+      hintUsed = true;
+      hintBtn.disabled = true;
+
+      soundHint();
+      triggerHaptic(35);
+      showToast(`Открыта ${randIdx + 1}-я буква: ${revealedLetter}`);
+    }
+
+    // =========================================================
+    // ПРОВЕРКА СЛОВА
+    // =========================================================
+    async function checkWord() {
+      const currentSession = sessionId;
+      isProcessing = true;
+
+      const guessArr = [...rowLetters];
+      const guessWord = guessArr.join('');
+      const targetArr = targetWord.split('');
+      const resultColors = Array(5).fill('absent');
+      const targetLetterCount = {};
+
+      targetArr.forEach(letter => {
+        targetLetterCount[letter] = (targetLetterCount[letter] || 0) + 1;
+      });
+
+      guessArr.forEach((letter, i) => {
+        if (letter === targetArr[i]) {
+          resultColors[i] = 'correct';
+          guessedPositions[i] = true;
+          targetLetterCount[letter]--;
+        }
+      });
+
+      guessArr.forEach((letter, i) => {
+        if (resultColors[i] !== 'correct' && targetLetterCount[letter] > 0) {
+          resultColors[i] = 'present';
+          targetLetterCount[letter]--;
+        }
+      });
+
+      const isWin = (guessWord === targetWord);
+
+      if (isWin) {
+        playSound('win3', 0.8);
+
+        for (let i = 0; i < 5; i++) {
+          if (currentSession !== sessionId) return;
+          const cell = cellGrid[currentRow][i];
+          cell.classList.remove('hint-cell');
+          cell.classList.add('correct', 'glow', 'wave');
+
+          const kbKey = kbMap[guessArr[i]];
+          if (kbKey) {
+            kbKey.classList.remove('present', 'absent');
+            kbKey.classList.add('correct');
+          }
+          await new Promise(r => setTimeout(r, 200));
+        }
+
+        if (currentSession !== sessionId) return;
+        await new Promise(r => setTimeout(r, 350));
+
+        for (let i = 0; i < 5; i++) {
+          cellGrid[currentRow][i].classList.add('scale-burst');
+        }
+
+        await new Promise(r => setTimeout(r, 1700));
+        if (currentSession !== sessionId) return;
+
+        isGameOver = true;
+        winScreen.classList.add('active');
+        startFireworks();
+        triggerHaptic([100, 50, 100, 50, 200]);
+      } else {
+        for (let i = 0; i < 5; i++) {
+          if (currentSession !== sessionId) return;
+          const letter = guessArr[i];
+          const color = resultColors[i];
+          const cell = cellGrid[currentRow][i];
+
+          cell.classList.remove('hint-cell');
+          cell.classList.add(color);
+
+          const kbKey = kbMap[letter];
+          if (kbKey) {
+            if (color === 'correct') {
+              kbKey.classList.remove('present', 'absent');
+              kbKey.classList.add('correct');
+            } else if (color === 'present') {
+              if (!kbKey.classList.contains('correct')) {
+                kbKey.classList.remove('absent');
+                kbKey.classList.add('present');
+              }
+            } else if (color === 'absent') {
+              if (!kbKey.classList.contains('correct') && !kbKey.classList.contains('present')) {
+                kbKey.classList.add('absent');
+              }
+            }
+          }
+
+          if (color === 'correct') {
+            playSound('win1', 0.55, 1.8 + i * 0.08);
+          } else if (color === 'present') {
+            playSound('win4', 0.5, 1.8);
+          } else {
+            playSound('absent', 0.45, 1.8);
+          }
+
+          await new Promise(r => setTimeout(r, 140));
+        }
+
+        if (currentSession !== sessionId) return;
+
+        if (currentRow === 5) {
+          isGameOver = true;
+          soundLose();
+          triggerHaptic([120, 60, 180]);
+          document.getElementById('revealed-word-box').textContent = targetWord;
+          setTimeout(() => {
+            if (currentSession === sessionId) {
+              loseScreen.classList.add('active');
+            }
+          }, 500);
+        } else {
+          currentRow++;
+          rowLetters = ['', '', '', '', ''];
+          lockedHintPositions = [false, false, false, false, false];
+          hintUsed = false;
+          hintBtn.disabled = false;
+          isProcessing = false;
+        }
+      }
+    }
+
+    function nextRound() {
+      currentWordIndex = (currentWordIndex + 1) % WORDS_DATA.length;
+      initGame();
+    }
+
+    function finishAndGoNext() {
+      sessionId++;
+      stopWinSound();
+      stopFireworks();
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+      }
+    }
+
+    // =========================================================
+    // ОПТИМИЗИРОВАННЫЙ ПУЛ САЛЮТА (БЕЗ ТОРМОЗОВ НА ANDROID)
+    // =========================================================
+    const fireworksContainer = document.getElementById('fireworks');
+    const FW_POOL_SIZE = 80;
+    const fwPool = [];
+    let fwAnimId = null;
+    let fwBurstInterval = null;
+    let fwLastTime = 0;
+
+    function initFireworksPool() {
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < FW_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        el.className = 'firework-particle';
+        fwPool.push({ el, active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, decay: 1 });
+        frag.appendChild(el);
+      }
+      fireworksContainer.appendChild(frag);
+    }
+
+    function spawnFireworkBurst() {
+      const colors = ['#f5c518', '#ff4a6a', '#4a9eff', '#ff9800', '#aaffb0', '#ff99cc', '#ffffff'];
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const cx = w * (0.15 + Math.random() * 0.7);
+      const cy = h * (0.15 + Math.random() * 0.65);
+      const count = 14;
+      let spawned = 0;
+
+      for (let i = 0; i < FW_POOL_SIZE && spawned < count; i++) {
+        const p = fwPool[i];
+        if (p.active) continue;
+
+        const angle = (Math.PI * 2 * spawned) / count + (Math.random() - 0.5) * 0.4;
+        const speed = 70 + Math.random() * 140;
+        const size = Math.round(4 + Math.random() * 5);
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        p.active = true;
+        p.x = cx;
+        p.y = cy;
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed;
+        p.life = 1.0;
+        p.decay = 0.8 + Math.random() * 0.5;
+
+        p.el.style.width = size + 'px';
+        p.el.style.height = size + 'px';
+        p.el.style.background = color;
+        p.el.style.opacity = '1';
+        p.el.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0)`;
+
+        spawned++;
+      }
+    }
+
+    function fireworksLoop(now) {
+      const dt = Math.min((now - fwLastTime) / 1000, 0.05);
+      fwLastTime = now;
+
+      for (let i = 0; i < FW_POOL_SIZE; i++) {
+        const p = fwPool[i];
+        if (!p.active) continue;
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 110 * dt;
+        p.life -= p.decay * dt;
+
+        if (p.life <= 0) {
+          p.active = false;
+          p.el.style.opacity = '0';
+          p.el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+        } else {
+          p.el.style.opacity = p.life.toFixed(2);
+          p.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0)`;
+        }
+      }
+
+      fwAnimId = requestAnimationFrame(fireworksLoop);
+    }
+
+    function startFireworks() {
+      stopFireworks();
+      spawnFireworkBurst();
+      fwBurstInterval = setInterval(spawnFireworkBurst, 450);
+      fwLastTime = performance.now();
+      fwAnimId = requestAnimationFrame(fireworksLoop);
+    }
+
+    function stopFireworks() {
+      if (fwBurstInterval) {
+        clearInterval(fwBurstInterval);
+        fwBurstInterval = null;
+      }
+      if (fwAnimId) {
+        cancelAnimationFrame(fwAnimId);
+        fwAnimId = null;
+      }
+      for (let i = 0; i < FW_POOL_SIZE; i++) {
+        fwPool[i].active = false;
+        fwPool[i].el.style.opacity = '0';
+        fwPool[i].el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+      }
+    }
+
+    // =========================================================
+    // ОБРАБОТЧИКИ СОБЫТИЙ
+    // =========================================================
+    document.getElementById('start-btn').addEventListener('click', () => {
+      unlockAudio();
+      triggerHaptic(20);
+      startScreen.style.display = 'none';
+      initGame();
+    });
+
+    muteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      unlockAudio();
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      if (isMuted) stopWinSound();
+    });
+
+    document.getElementById('help-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      rulesModal.classList.add('active');
+    });
+
+    document.getElementById('close-rules-btn').addEventListener('click', () => {
+      rulesModal.classList.remove('active');
+    });
+
+    rulesModal.addEventListener('click', () => {
+      rulesModal.classList.remove('active');
+    });
+
+    document.getElementById('rules-content').addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    hintBtn.addEventListener('click', () => {
+      unlockAudio();
+      useHint();
+    });
+
+    document.getElementById('win-next-btn').addEventListener('click', finishAndGoNext);
+    document.getElementById('win-more-btn').addEventListener('click', nextRound);
+    document.getElementById('lose-more-btn').addEventListener('click', nextRound);
+
+    document.addEventListener('keydown', (e) => {
+      if (isGameOver || isProcessing || startScreen.style.display !== 'none') return;
+      if (e.key === 'Enter') handleKey('ENTER');
+      else if (e.key === 'Backspace') handleKey('BACKSPACE');
+      else if (/^[А-Яа-яЁё]$/.test(e.key)) handleKey(e.key.toUpperCase());
+    });
+
+    document.querySelectorAll('.kb-key').forEach(btn => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        unlockAudio();
+        if (isGameOver || isProcessing || startScreen.style.display !== 'none') return;
+        handleKey(btn.dataset.key);
+      });
+    });
+
+    buildBoardOnce();
+    initFireworksPool();
+  </script>
+</body>
+</html>

@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Гендер-батл</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #0a0f1e;
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  h2 { margin-bottom: 10px; font-size: 24px; font-weight: 800; }
+  #status { font-size: 18px; font-weight: 700; color: #4a9eff; margin-bottom: 20px; }
+  #status.ai-turn { color: #ff4a6a; }
+  #board {
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    gap: 10px; width: min(85vw, 320px); aspect-ratio: 1; margin-bottom: 26px;
+    touch-action: none;
+  }
+  .cell {
+    background: #1c2745; border: 2px solid rgba(245, 197, 24, 0.25); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: transform 0.09s ease-out;
+  }
+  .cell:active:not(.taken) { transform: scale(0.92) translateZ(0); }
+  .cell.taken { cursor: default; }
+  .cell.win {
+    animation: pulse-win 0.8s ease-in-out infinite;
+    border-color: #f5c518;
+    background: rgba(245, 197, 24, 0.18);
+    box-shadow: 0 0 18px rgba(245, 197, 24, 0.65), 0 0 6px rgba(245, 197, 24, 0.45);
+  }
+  @keyframes pulse-win {
+    0%, 100% {
+      transform: scale(1) translateZ(0);
+      opacity: 1;
+      box-shadow: 0 0 18px rgba(245, 197, 24, 0.65), 0 0 6px rgba(245, 197, 24, 0.45);
+    }
+    50% {
+      transform: scale(1.04) translateZ(0);
+      opacity: 0.9;
+      box-shadow: 0 0 28px rgba(245, 197, 24, 0.95), 0 0 12px rgba(245, 197, 24, 0.7);
+    }
+  }
+
+  .symbol-svg {
+    width: 80%; height: 80%;
+    overflow: visible;
+    transform: translateZ(0);
+  }
+  .draw-path {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 250;
+    stroke-dashoffset: 250;
+  }
+  
+  .symbol-x .draw-path {
+    stroke: #4a9eff;
+  }
+  .symbol-x .path-1 { animation: draw 0.25s ease-out forwards; }
+  .symbol-x .path-2 { animation: draw 0.25s 0.2s ease-out forwards; }
+
+  .symbol-y .draw-path {
+    stroke: #ff4a6a;
+  }
+  .symbol-y .path-1 { animation: draw 0.18s ease-out forwards; }
+  .symbol-y .path-2 { animation: draw 0.18s 0.15s ease-out forwards; }
+  .symbol-y .path-3 { animation: draw 0.18s 0.3s ease-out forwards; }
+
+  @keyframes draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-height: 112px;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #f5c518, #ff9800); color: #10172b;
+    border: none; padding: 14px 30px; font-size: 16px; font-weight: 900;
+    font-family: inherit; border-radius: 50px; cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out, background 0.15s ease-out;
+    min-width: 210px;
+  }
+  .btn:active { transform: scale(0.95) translateZ(0); }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 12px 26px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .btn-secondary:active {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  #start-screen {
+    position: absolute; inset: 0;
+    background: rgba(10, 15, 30, 0.94);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 90;
+  }
+</style>
+</head>
+<body>
+  <h2>Гендер-батл</h2>
+  <div id="status">Твой ход (X)</div>
+  <div id="board"></div>
+  <div class="controls">
+    <button class="btn hidden" id="next-btn">Дальше</button>
+    <button class="btn btn-secondary hidden" id="restart-btn">Переиграть</button>
+  </div>
+
+  <div id="start-screen">
+    <button class="btn" id="start-btn">Начать</button>
+  </div>
+
+  <script>
+    const COMBOS = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]];
+    let board = Array(9).fill(null);
+    let currentPlayer = 'X';
+    let gameOver = false;
+    let isProcessing = false;
+    let gameSessionId = 0;
+    let activeTimers = [];
+
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const startScreen = document.getElementById('start-screen');
+    const nextBtn = document.getElementById('next-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const cellElements = [];
+
+    // =========================================================
+    // 1. ВИБРООТКЛИК (ANDROID)
+    // =========================================================
+    function triggerHaptic(ms = 15) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(ms); } catch (e) {}
+      }
+    }
+
+    // =========================================================
+    // 2. ГИБРИДНЫЙ ЗВУК (ЧИСТЫЙ ПЕРВЫЙ ЗВУК НА IPHONE + ПУСК С НУЛЯ)
+    // =========================================================
+    const SOUND_URLS = {
+      x: '../sounds/krestik4.mp3',
+      y: '../sounds/ygreck.mp3',
+      win: '../sounds/win1.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const soundBuffers = { x: null, y: null, win: null };
+    const htmlAudioFallback = {
+      x: new Audio(SOUND_URLS.x),
+      y: new Audio(SOUND_URLS.y),
+      win: new Audio(SOUND_URLS.win)
+    };
+
+    Object.values(htmlAudioFallback).forEach(audio => {
+      audio.preload = 'auto';
+    });
+
+    const isFileProtocol = window.location.protocol === 'file:';
+
+    async function loadSoundBuffer(key, url) {
+      if (!audioCtx || isFileProtocol) return;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('HTTP error');
+        const arrayBuffer = await response.arrayBuffer();
+        soundBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        soundBuffers[key] = null;
+      }
+    }
+
+    loadSoundBuffer('x', SOUND_URLS.x);
+    loadSoundBuffer('y', SOUND_URLS.y);
+    loadSoundBuffer('win', SOUND_URLS.win);
+
+    let audioUnlocked = false;
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+
+      if (audioCtx) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        try {
+          const buffer = audioCtx.createBuffer(1, 1, 22050);
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          source.start(0);
+        } catch (e) {}
+      }
+    }
+
+    function playBufferNow(buffer, volume) {
+      const source = audioCtx.createBufferSource();
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = volume;
+      source.buffer = buffer;
+      source.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      source.start(0);
+    }
+
+    function playFallbackAudio(key, volume) {
+      const base = htmlAudioFallback[key];
+      if (!base) return;
+      try {
+        base.pause();
+        base.currentTime = 0;
+        base.volume = volume;
+        base.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    function playSoundInstant(key, volume = 0.5) {
+      const buffer = soundBuffers[key];
+      if (audioCtx && buffer && !isFileProtocol) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(() => {
+            playBufferNow(buffer, volume);
+          }).catch(() => {
+            playFallbackAudio(key, volume);
+          });
+        } else {
+          playBufferNow(buffer, volume);
+        }
+      } else {
+        playFallbackAudio(key, volume);
+      }
+    }
+
+    function safeTimeout(fn, delay) {
+      const currentSession = gameSessionId;
+      const id = setTimeout(() => {
+        if (currentSession === gameSessionId) {
+          fn();
+        }
+      }, delay);
+      activeTimers.push(id);
+      return id;
+    }
+
+    function clearAllTimers() {
+      for (let i = 0; i < activeTimers.length; i++) {
+        clearTimeout(activeTimers[i]);
+      }
+      activeTimers.length = 0;
+    }
+
+    // =========================================================
+    // 3. СОЗДАНИЕ СЕТКИ ПОЛЯ ОДИН РАЗ ПРИ ЗАГРУЗКЕ
+    // =========================================================
+    function buildBoardOnce() {
+      boardEl.innerHTML = '';
+      cellElements.length = 0;
+      const fragment = document.createDocumentFragment();
+
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          unlockAudio();
+          handleClick(i);
+        });
+        cellElements.push(cell);
+        fragment.appendChild(cell);
+      }
+
+      boardEl.appendChild(fragment);
+    }
+
+    // =========================================================
+    // 4. ЛОГИКА ИГРЫ
+    // =========================================================
+    function generateXPaths() {
+      const cx = 50;
+      const cy = 50;
+      const offsetX = (Math.random() * 16) - 8;
+      const offsetY = (Math.random() * 16) - 8;
+      const centerX = cx + offsetX;
+      const centerY = cy + offsetY;
+      
+      const angle1 = (40 + Math.random() * 35) * Math.PI / 180;
+      const len1 = 75 + Math.random() * 15;
+      const r1 = len1 / 2;
+      const xA = centerX - r1 * Math.cos(angle1);
+      const yA = centerY - r1 * Math.sin(angle1);
+      const xC = centerX + r1 * Math.cos(angle1);
+      const yC = centerY + r1 * Math.sin(angle1);
+      
+      const angle2 = (-40 - Math.random() * 35) * Math.PI / 180;
+      const len2 = 75 + Math.random() * 15;
+      const r2 = len2 / 2;
+      const xB = centerX - r2 * Math.cos(angle2);
+      const yB = centerY - r2 * Math.sin(angle2);
+      const xD = centerX + r2 * Math.cos(angle2);
+      const yD = centerY + r2 * Math.sin(angle2);
+      
+      const mid1x = (xA + xC) / 2 + (Math.random() * 40 - 20);
+      const mid1y = (yA + yC) / 2 + (Math.random() * 40 - 20);
+      const mid2x = (xB + xD) / 2 + (Math.random() * 40 - 20);
+      const mid2y = (yB + yD) / 2 + (Math.random() * 40 - 20);
+      
+      return {
+        d1: `M ${xA},${yA} Q ${mid1x},${mid1y} ${xC},${yC}`,
+        d2: `M ${xB},${yB} Q ${mid2x},${mid2y} ${xD},${yD}`
+      };
+    }
+
+    function initGame(withHaptic = false) {
+      if (withHaptic) triggerHaptic(15);
+      gameSessionId++;
+      clearAllTimers();
+
+      board = Array(9).fill(null);
+      currentPlayer = 'X';
+      gameOver = false;
+      isProcessing = false;
+      
+      statusEl.style.color = '';
+      nextBtn.classList.add('hidden');
+      restartBtn.classList.add('hidden');
+      restartBtn.textContent = 'Переиграть';
+      
+      for (let i = 0; i < 9; i++) {
+        cellElements[i].className = 'cell';
+        cellElements[i].innerHTML = '';
+      }
+
+      updateStatus();
+    }
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+      unlockAudio();
+      triggerHaptic(15);
+      startScreen.style.display = 'none';
+    });
+
+    restartBtn.addEventListener('click', () => {
+      unlockAudio();
+      initGame(true);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      unlockAudio();
+      triggerHaptic(15);
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: "QUEST_WIN" }, "*");
+      }
+    });
+
+    function handleClick(i) {
+      if (isProcessing || gameOver || board[i] !== null || currentPlayer !== 'X') return;
+      
+      isProcessing = true;
+      triggerHaptic(15);
+      restartBtn.classList.remove('hidden');
+      
+      makeMove(i, 'X');
+      if (gameOver) return;
+
+      currentPlayer = 'Y';
+      updateStatus();
+      
+      safeTimeout(() => {
+        aiMove();
+      }, 1100);
+    }
+
+    function makeMove(i, player) {
+      board[i] = player;
+      const cell = cellElements[i];
+      if (!cell) return;
+      
+      cell.classList.add('taken');
+      
+      if (player === 'X') {
+        const paths = generateXPaths();
+        cell.innerHTML = `
+          <svg class="symbol-svg symbol-x" viewBox="0 0 100 100">
+            <path class="draw-path path-1" d="${paths.d1}" />
+            <path class="draw-path path-2" d="${paths.d2}" />
+          </svg>
+        `;
+        playSoundInstant('x', 0.5);
+      } else {
+        cell.innerHTML = `
+          <svg class="symbol-svg symbol-y" viewBox="0 0 100 100">
+            <path class="draw-path path-1" d="M 50,80 L 50,50" />
+            <path class="draw-path path-2" d="M 50,50 L 20,20" />
+            <path class="draw-path path-3" d="M 50,50 L 80,20" />
+          </svg>
+        `;
+        playSoundInstant('y', 0.5);
+      }
+
+      const winCombo = checkWin(player);
+
+      if (winCombo) {
+        gameOver = true;
+        winCombo.forEach(idx => cellElements[idx].classList.add('win'));
+        
+        if (player === 'X') {
+          statusEl.textContent = 'XX - Ура! У нас дочка! 🎉';
+          statusEl.style.color = '#ffd700';
+          safeTimeout(() => playSoundInstant('win', 0.7), 200);
+          nextBtn.classList.remove('hidden');
+          restartBtn.textContent = 'Ещё разик';
+        } else {
+          statusEl.textContent = 'YY - гендерный сбой. Давай ещё! 😉';
+          statusEl.style.color = '#ff4a6a';
+          safeTimeout(() => { 
+            initGame(false); 
+          }, 3200);
+        }
+        return;
+      }
+
+      if (board.every(c => c !== null)) {
+        gameOver = true;
+        statusEl.textContent = 'XY - мальчик? Переиграем. 🧬';
+        statusEl.style.color = '#feca57';
+        safeTimeout(() => { 
+          initGame(false); 
+        }, 3200);
+        return;
+      }
+    }
+
+    function checkWin(p) {
+      for (const c of COMBOS) if (c.every(i => board[i] === p)) return c;
+      return null;
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+      
+      let moveIndex = null;
+      if (Math.random() < 0.3) {
+        for (let i = 0; i < 9; i++) {
+          if (board[i] === null) {
+            board[i] = 'X';
+            if (checkWin('X')) { board[i] = null; moveIndex = i; break; }
+            board[i] = null;
+          }
+        }
+      }
+      if (moveIndex === null) {
+        const empty = board.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
+        moveIndex = empty[Math.floor(Math.random() * empty.length)];
+      }
+      
+      makeMove(moveIndex, 'Y');
+      
+      if (!gameOver) { 
+        safeTimeout(() => {
+          currentPlayer = 'X'; 
+          isProcessing = false;
+          updateStatus(); 
+        }, 350);
+      }
+    }
+
+    function updateStatus() {
+      if (gameOver) return;
+      if (currentPlayer === 'X') {
+        statusEl.textContent = 'Твой ход (X)';
+        statusEl.classList.remove('ai-turn');
+      } else {
+        statusEl.textContent = 'Ход компьютера...';
+        statusEl.classList.add('ai-turn');
+      }
+    }
+
+    buildBoardOnce();
+    initGame(false);
+  </script>
+</body>
+</html>

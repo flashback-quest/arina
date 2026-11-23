@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Игра 5 (Что лишнее? 3x3)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: #0a0f1e;
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 20px;
+  }
+  
+  /* Шапка */
+  .header {
+    width: min(90vw, 350px);
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  h2 { font-size: 20px; color: #f5c518; }
+  #round-counter { font-size: 16px; font-weight: 700; color: #4a9eff; }
+
+  /* Таймер */
+  .timer-container {
+    width: min(90vw, 350px);
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  #timer-bar {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #4caf50, #f5c518);
+    border-radius: 10px;
+    transition: width 0.1s linear;
+  }
+  #timer-bar.warning { background: #ff4a6a; }
+
+  /* Игровое поле 3х3 */
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: min(90vw, 350px);
+    aspect-ratio: 1;
+    position: relative;
+    touch-action: none;
+  }
+
+  /* Карточки */
+  .card {
+    background: #1c2745;
+    border: 2px solid rgba(245, 197, 24, 0.3);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(30px, 8vw, 45px);
+    cursor: pointer;
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: transform 0.12s ease-out;
+  }
+
+  .card:active { transform: scale(0.92) translateZ(0); border-color: rgba(245, 197, 24, 0.8); }
+  
+  /* Анимация правильного ответа */
+  .card.correct {
+    animation: fly-away 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    pointer-events: none;
+  }
+  @keyframes fly-away {
+    0% { transform: scale(1) rotate(0deg) translateZ(0); opacity: 1; }
+    100% { transform: scale(1.4) rotate(18deg) translateZ(0); opacity: 0; }
+  }
+
+  /* Анимация ошибки */
+  .card.wrong {
+    animation: shake 0.35s ease both;
+    border-color: #ff4a6a;
+    background: rgba(255, 74, 106, 0.22);
+  }
+  @keyframes shake {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    20%, 60% { transform: translate3d(-5px, 0, 0); }
+    40%, 80% { transform: translate3d(5px, 0, 0); }
+  }
+
+  /* Статус текст */
+  #status { margin-top: 15px; font-size: 14px; font-weight: 700; color: #ccc; text-align: center; min-height: 20px; }
+
+  /* Кнопка звука */
+  #mute-btn {
+    background: rgba(28, 39, 69, 0.85);
+    border: 2px solid rgba(245, 197, 24, 0.4);
+    color: #f5c518;
+    font-size: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 110;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  #mute-btn:active { transform: scale(0.9) translateZ(0); }
+
+  /* Стартовый экран */
+  #start-screen {
+    position: fixed; inset: 0;
+    background: rgba(10, 15, 30, 0.96);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 120; text-align: center; padding: 24px;
+  }
+  #start-screen h3 {
+    color: #f5c518;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+  #start-screen p {
+    color: #b8d4ff;
+    font-size: 15px;
+    margin-bottom: 24px;
+    max-width: 280px;
+    line-height: 1.4;
+  }
+
+  /* Экран победы */
+  #win-screen {
+    position: fixed; inset: 0;
+    background: rgba(10, 15, 30, 0.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; text-align: center; padding: 24px;
+  }
+  #win-screen.active { display: flex; }
+  #win-screen h3 {
+    color: #f5c518;
+    font-size: 32px;
+    font-weight: 900;
+    margin-bottom: 24px;
+    z-index: 10;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #ffe066 0%, #f5c518 50%, #ff9800 100%);
+    color: #10172b;
+    border: 2px solid #fff5b8;
+    padding: 13px 40px;
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 900;
+    border-radius: 50px;
+    cursor: pointer;
+    z-index: 10;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .btn:active { transform: scale(0.95) translateZ(0); }
+
+  .back-hint {
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #b8d4ff;
+    max-width: 260px;
+    z-index: 10;
+    opacity: 0.9;
+  }
+
+  /* Салют (пул частиц без тяжелых теней) */
+  #fireworks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+  .firework-particle {
+    position: absolute; top: 0; left: 0;
+    border-radius: 50%; pointer-events: none;
+    opacity: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .firework-particle.burst {
+    animation: firework-burst 1.3s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+  }
+  @keyframes firework-burst {
+    0% { transform: translate3d(var(--sx), var(--sy), 0) scale(1); opacity: 1; }
+    100% { transform: translate3d(var(--ex), var(--ey), 0) scale(0.2); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <div id="start-screen">
+    <h3>Что здесь лишнее?</h3>
+    <p>Найди один лишний предмет среди девяти за отведённое время!</p>
+    <button class="btn" id="start-btn">Начать</button>
+  </div>
+
+  <div class="header">
+    <h2>Что здесь лишнее?</h2>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div id="round-counter">Раунд 1 / 10</div>
+      <button id="mute-btn" title="Звук">🔊</button>
+    </div>
+  </div>
+  
+  <div class="timer-container">
+    <div id="timer-bar"></div>
+  </div>
+
+  <div id="board"></div>
+  
+  <div id="status">Найди лишний предмет!</div>
+
+  <!-- Экран победы -->
+  <div id="win-screen">
+    <div id="fireworks"></div>
+    <div style="font-size: 52px; margin-bottom: 6px; z-index: 10;">🎉</div>
+    <h3>Отлично!</h3>
+    <button class="btn" id="next-btn">Дальше</button>
+    <div class="back-hint">Можно вернуться в эту игру со следующего экрана по кнопке «Назад».</div>
+  </div>
+
+  <script>
+    const roundsData = [
+      { items: ['🍎', '🍌', '🍐', '🍓', '🍇', '🍉', '🍊', '🍒', '🍔'], odd: '🍔' },
+      { items: ['✈️', '🚁', '🦅', '🦇', '🦋', '🐝', '🪁', '🚀', '🚲'], odd: '🚲' },
+      { items: ['🐟', '🐠', '🐡', '🦈', '🐬', '🐳', '🐙', '🦀', '🐶'], odd: '🐶' },
+      { items: ['🎸', '🎹', '🎻', '🎺', '🥁', '🎷', '🪕', '📯', '🧸'], odd: '🧸' },
+      { items: ['⛄', '🧤', '🧣', '🧥', '🛷', '⛷️', '🏂', '❄️', '🕶️'], odd: '🕶️' },
+      { items: ['🌻', '🍋', '🍌', '🌽', '🧀', '🌟', '🐤', '🚕', '🍎'], odd: '🍎' },
+      { items: ['👸', '🤴', '🧙‍♀️', '🧚‍♀️', '🧜‍♀️', '🧞‍♂️', '🦄', '🐉', '🚗'], odd: '🚗' },
+      { items: ['🚀', '🛸', '🪐', '🌌', '🌙', '⭐', '☄️', '👽', '🐟'], odd: '🐟' },
+      { items: ['📱', '📺', '📚', '📦', '🚪', '🧱', '🎴', '💳', '🥚'], odd: '🥚' },
+      { items: ['⚽', '🏀', '🎾', '🏐', '🏈', '🎱', '🏓', '🏸', '🛌'], odd: '🛌' }
+    ];
+
+    /* ============================================================
+       АУДИО С ПРОБУЖДЕНИЕМ НА iOS SAFARI
+       ============================================================ */
+    let audioCtx = null;
+    let isMuted = false;
+    let audioUnlocked = false;
+    let bgmStarted = false;
+
+    const bgMusic = new Audio('../music/chto_lishnee_fon.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.25;
+    bgMusic.preload = 'auto';
+
+    function startBgMusic() {
+      bgmStarted = true;
+      bgMusic.muted = isMuted;
+      if (!isMuted && bgMusic.paused && !winScreen.classList.contains('active')) {
+        bgMusic.play().catch(() => {});
+      }
+    }
+
+    function initAudio() {
+      try {
+        if (!audioCtx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          audioCtx = new Ctx();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        if (!audioUnlocked && audioCtx) {
+          audioUnlocked = true;
+          const buffer = audioCtx.createBuffer(1, 1, 22050);
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          source.start(0);
+        }
+      } catch (e) {}
+    }
+
+    function playTone(freq, type, duration, vol = 0.12, slideTo = null) {
+      if (!audioCtx || isMuted) return;
+      try {
+        const now = audioCtx.currentTime + 0.01;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + duration + 0.01);
+      } catch (e) {}
+    }
+
+    function soundCorrect() {
+      playTone(660, 'sine', 0.1, 0.14, 990);
+      setTimeout(() => playTone(1100, 'sine', 0.15, 0.12), 65);
+    }
+    function soundWrong() {
+      playTone(180, 'sawtooth', 0.22, 0.14, 90);
+    }
+    function soundTick() {
+      playTone(900, 'triangle', 0.04, 0.08);
+    }
+    function soundWin() {
+      playTone(523.25, 'sine', 0.18, 0.14);
+      setTimeout(() => playTone(659.25, 'sine', 0.18, 0.14), 130);
+      setTimeout(() => playTone(783.99, 'sine', 0.18, 0.14), 260);
+      setTimeout(() => playTone(1046.50, 'sine', 0.5, 0.18), 390);
+    }
+
+    const muteBtn = document.getElementById('mute-btn');
+    muteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initAudio();
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      bgMusic.muted = isMuted;
+      if (!isMuted && bgmStarted && bgMusic.paused && !winScreen.classList.contains('active')) {
+        bgMusic.play().catch(() => {});
+      }
+    });
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+      }
+    });
+
+    let currentRound = 0;
+    let currentOddItem = '';
+    let isAnimating = false;
+    let timeLeft = 15000;
+    let lastTickSec = 6;
+    let timerInterval = null;
+    const MAX_TIME = 15000;
+
+    const boardEl = document.getElementById('board');
+    const winScreen = document.getElementById('win-screen');
+    const startScreen = document.getElementById('start-screen');
+    const roundCounterEl = document.getElementById('round-counter');
+    const timerBar = document.getElementById('timer-bar');
+    const statusEl = document.getElementById('status');
+
+    // ============================================================
+    // ПУЛ ИЗ 9 КАРТОЧЕК И 90 ЧАСТИЦ САЛЮТА (СОЗДАЮТСЯ 1 РАЗ)
+    // ============================================================
+    const cardsPool = [];
+    const PARTICLE_POOL_SIZE = 90;
+    const particlePool = [];
+    let particleCursor = 0;
+
+    function initPools() {
+      const cardFrag = document.createDocumentFragment();
+      for (let i = 0; i < 9; i++) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          initAudio();
+          if (bgmStarted && !isMuted && bgMusic.paused && !winScreen.classList.contains('active')) {
+            bgMusic.play().catch(() => {});
+          }
+          handleCardClick(card, card.dataset.item, currentOddItem);
+        });
+        cardsPool.push(card);
+        cardFrag.appendChild(card);
+      }
+      boardEl.appendChild(cardFrag);
+
+      const fwContainer = document.getElementById('fireworks');
+      const fwFrag = document.createDocumentFragment();
+      for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+        const p = document.createElement('div');
+        p.className = 'firework-particle';
+        particlePool.push(p);
+        fwFrag.appendChild(p);
+      }
+      fwContainer.appendChild(fwFrag);
+    }
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+      initAudio();
+      startBgMusic();
+      startScreen.style.display = 'none';
+      setTimeout(initGame, 35);
+    });
+
+    function initGame() {
+      winScreen.classList.remove('active');
+      if (bgmStarted && !isMuted && bgMusic.paused) {
+        bgMusic.play().catch(() => {});
+      }
+      currentRound = 0;
+      isAnimating = false;
+      loadRound();
+    }
+
+    function loadRound() {
+      isAnimating = false;
+      statusEl.textContent = 'Найди лишний предмет!';
+      statusEl.style.color = '#ccc';
+      
+      roundCounterEl.textContent = `Раунд ${currentRound + 1} / 10`;
+      
+      const data = roundsData[currentRound];
+      currentOddItem = data.odd;
+      const shuffledItems = shuffleArray(data.items);
+
+      for (let i = 0; i < 9; i++) {
+        const card = cardsPool[i];
+        const item = shuffledItems[i];
+        card.className = 'card';
+        card.style.borderColor = '';
+        card.textContent = item;
+        card.dataset.item = item;
+      }
+
+      startTimer();
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timeLeft = MAX_TIME;
+      lastTickSec = 6;
+      timerBar.style.width = '100%';
+      timerBar.classList.remove('warning');
+
+      timerInterval = setInterval(() => {
+        timeLeft -= 100;
+        
+        const percentage = Math.max(0, (timeLeft / MAX_TIME) * 100);
+        timerBar.style.width = percentage + '%';
+
+        if (timeLeft <= 5000 && timeLeft > 0) {
+          timerBar.classList.add('warning');
+          const secNow = Math.ceil(timeLeft / 1000);
+          if (secNow < lastTickSec) {
+            lastTickSec = secNow;
+            soundTick();
+          }
+        }
+
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          handleTimeout();
+        }
+      }, 100);
+    }
+
+    function handleCardClick(card, item, oddItem) {
+      if (isAnimating || timeLeft <= 0) return;
+
+      if (item === oddItem) {
+        clearInterval(timerInterval);
+        isAnimating = true;
+        card.classList.add('correct');
+        soundCorrect();
+        if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) {} }
+        
+        setTimeout(() => {
+          currentRound++;
+          if (currentRound >= roundsData.length) {
+            showWin();
+          } else {
+            loadRound();
+          }
+        }, 550);
+      } else {
+        card.classList.remove('wrong');
+        void card.offsetWidth;
+        card.classList.add('wrong');
+        soundWrong();
+        if (navigator.vibrate) { try { navigator.vibrate([40, 40, 40]); } catch (e) {} }
+        
+        timeLeft = Math.max(0, timeLeft - 1500); 
+
+        setTimeout(() => {
+          card.classList.remove('wrong');
+        }, 380);
+      }
+    }
+
+    function handleTimeout() {
+      if (isAnimating) return;
+      isAnimating = true;
+      soundWrong();
+      
+      statusEl.textContent = 'Ой, время вышло! Попробуй ещё раз.';
+      statusEl.style.color = '#ff4a6a';
+      if (navigator.vibrate) { try { navigator.vibrate([80, 80, 80]); } catch (e) {} }
+
+      for (let i = 0; i < 9; i++) {
+        if (cardsPool[i].dataset.item === currentOddItem) {
+          cardsPool[i].style.borderColor = '#f5c518';
+        }
+      }
+
+      setTimeout(() => {
+        isAnimating = false;
+        loadRound();
+      }, 1800);
+    }
+
+    function shuffleArray(array) {
+      const a = [...array];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function showWin() {
+      clearInterval(timerInterval);
+      bgMusic.pause();
+      winScreen.classList.add('active');
+      soundWin();
+      launchFireworks();
+      if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80, 40, 150]); } catch (e) {} }
+    }
+
+    function launchFireworks() {
+      const colors = ['#f5c518', '#ff4a6a', '#4a9eff', '#ff9800', '#aaffb0', '#ff99cc', '#ffffff'];
+      const screenW = window.innerWidth || 360;
+      const screenH = window.innerHeight || 640;
+      
+      for (let b = 0; b < 10; b++) {
+        setTimeout(() => {
+          const sx = (0.15 + Math.random() * 0.7) * screenW;
+          const sy = (0.15 + Math.random() * 0.65) * screenH;
+          const particleCount = 9;
+
+          for (let i = 0; i < particleCount; i++) {
+            const particle = particlePool[particleCursor];
+            particleCursor = (particleCursor + 1) % PARTICLE_POOL_SIZE;
+
+            const color = colors[(b + i) % colors.length];
+            const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5;
+            const distance = 45 + Math.random() * 100;
+            const size = 5 + Math.round(Math.random() * 4);
+
+            particle.classList.remove('burst');
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            particle.style.background = color;
+            particle.style.setProperty('--sx', sx.toFixed(0) + 'px');
+            particle.style.setProperty('--sy', sy.toFixed(0) + 'px');
+            particle.style.setProperty('--ex', (sx + Math.cos(angle) * distance).toFixed(0) + 'px');
+            particle.style.setProperty('--ey', (sy + Math.sin(angle) * distance).toFixed(0) + 'px');
+            
+            void particle.offsetWidth;
+            particle.classList.add('burst');
+          }
+        }, b * 220);
+      }
+    }
+
+    initPools();
+  </script>
+</body>
+</html>

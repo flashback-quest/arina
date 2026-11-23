@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Морской бой</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            background-color: #0f1d3a;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-evenly;
+            padding: 10px 12px 14px;
+            position: relative;
+        }
+
+        .top-bar {
+            width: 100%;
+            max-width: 460px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 20;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            color: #facc15;
+            font-size: clamp(20px, 5.5vw, 24px);
+            margin: 0 0 4px 0;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: clamp(12px, 3.4vw, 14px);
+            color: #38bdf8;
+            text-align: center;
+            min-height: 34px;
+            line-height: 1.25;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 46px;
+        }
+
+        .mute-btn {
+            position: fixed;
+            top: 12px;
+            z-index: 150;
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(250, 204, 21, 0.45);
+            color: #facc15;
+            font-size: 18px;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            transform: translateZ(0);
+        }
+        .mute-btn.left {
+            left: 12px;
+        }
+        .mute-btn.right {
+            right: 12px;
+        }
+        .mute-btn:active {
+            transform: scale(0.92) translateZ(0);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            z-index: 20;
+            width: 100%;
+            max-width: 360px;
+            flex-shrink: 0;
+        }
+
+        .ship-buttons {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        button.game-btn {
+            background-color: rgba(15, 23, 42, 0.75);
+            color: #facc15;
+            border: 2px solid #facc15;
+            padding: 8px 14px;
+            font-size: 13px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-family: inherit;
+            transition: transform 0.12s, background-color 0.2s;
+            transform: translateZ(0);
+        }
+        button.game-btn:active:not(:disabled) {
+            transform: scale(0.95) translateZ(0);
+        }
+
+        #btn-rotate {
+            color: #ffffff;
+            border-color: #38bdf8;
+            width: 100%;
+            max-width: 240px;
+        }
+
+        #btn-start {
+            background-color: #16a34a;
+            color: #ffffff;
+            border-color: #22c55e;
+            width: 100%;
+            max-width: 240px;
+            font-size: 15px;
+            padding: 10px 20px;
+        }
+
+        button.game-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background-color: #1e293b !important;
+            border-color: #475569 !important;
+            color: #94a3b8 !important;
+        }
+
+        /* Полноэкранный слой подзорной трубы с плавным появлением и растворением */
+        .spyglass-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 95;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.55s ease-in-out;
+            will-change: opacity;
+            background: radial-gradient(circle at 50% 50%, transparent 160px, rgba(0, 0, 0, 0.96) 182px, #000000 100%);
+        }
+        .spyglass-overlay.active {
+            opacity: 1;
+        }
+
+        /* Контейнер игровых полей (адаптируется и по ширине, и по высоте монитора) */
+        .boards-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            width: min(88vw, 48dvh, 400px);
+            height: calc(min(88vw, 48dvh, 400px) + 32px);
+            margin: 0 auto;
+            touch-action: none;
+            flex-shrink: 0;
+        }
+
+        .board-wrapper {
+            text-align: center;
+            width: 100%;
+            transition: transform 1.25s cubic-bezier(0.25, 0.9, 0.35, 1), opacity 0.8s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform, opacity;
+        }
+
+        .board-title {
+            font-size: 14px;
+            font-weight: 800;
+            height: 24px;
+            line-height: 24px;
+            margin-bottom: 8px;
+            color: #38bdf8;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        .active-board {
+            transform: translate3d(0, 0, 0);
+            opacity: 1;
+            z-index: 5;
+        }
+
+        .slide-left {
+            transform: translate3d(-145%, 0, 0);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .slide-right {
+            transform: translate3d(145%, 0, 0);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: rgba(30, 41, 59, 0.55);
+            border: 2px solid #facc15;
+            border-radius: 12px;
+            padding: 4px;
+            transform: translateZ(0);
+        }
+
+        .board.shake {
+            animation: boardShake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes boardShake {
+            10%, 90% { transform: translate3d(-3px, 0, 0); }
+            20%, 80% { transform: translate3d(5px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+            40%, 60% { transform: translate3d(5px, 0, 0); }
+        }
+
+        .cell {
+            width: 100%;
+            height: 100%;
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .cell-coord {
+            position: absolute;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.42);
+            pointer-events: none;
+        }
+        .coord-col { top: 2px; right: 4px; }
+        .coord-row { bottom: 2px; left: 4px; }
+
+        .cell.ship {
+            border: 3px solid #ffffff;
+            z-index: 10;
+        }
+        .cell.ship.connect-right { border-right: none !important; }
+        .cell.ship.connect-left { border-left: none !important; }
+        .cell.ship.connect-bottom { border-bottom: none !important; }
+        .cell.ship.connect-top { border-top: none !important; }
+
+        .cell.ship.round-left { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+        .cell.ship.round-right { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+        .cell.ship.round-top { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+        .cell.ship.round-bottom { border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+        .cell.ship.round-all { border-radius: 10px; }
+
+        .cell.ship::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 10px; height: 10px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 11;
+        }
+
+        .cell.hit {
+            background: radial-gradient(circle, #ef4444 0%, #b91c1c 55%, rgba(15,29,58,0) 85%) !important;
+            border-color: #f87171 !important;
+            pointer-events: none;
+        }
+        .cell.hit::before {
+            content: "💥";
+            font-size: clamp(20px, 4.5vmin, 30px);
+            z-index: 15;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%; height: 100%;
+            animation: popIn 0.28s ease-out;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.2); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .cell.sunk {
+            border: 3px solid #ff4a6a !important;
+            background: radial-gradient(circle, #ef4444 0%, #b91c1c 65%, rgba(15,29,58,0) 92%) !important;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .cell.sunk.connect-right { border-right: none !important; }
+        .cell.sunk.connect-left { border-left: none !important; }
+        .cell.sunk.connect-bottom { border-bottom: none !important; }
+        .cell.sunk.connect-top { border-top: none !important; }
+
+        .cell.sunk.round-left { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+        .cell.sunk.round-right { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+        .cell.sunk.round-top { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+        .cell.sunk.round-bottom { border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+        .cell.sunk.round-all { border-radius: 10px; }
+
+        .cell.miss {
+            background: radial-gradient(circle at center, rgba(0, 0, 0, 0.65) 12%, rgba(56, 189, 248, 0.15) 35%, rgba(15, 29, 58, 0) 70%) !important;
+            pointer-events: none;
+        }
+        .cell.miss::before, .cell.miss::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 6px; height: 6px;
+            border: 2px solid #38bdf8;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            animation: waterRipple 2s ease-out forwards;
+        }
+        .cell.miss::after { animation-delay: 0.45s; }
+
+        @keyframes waterRipple {
+            0% { width: 6px; height: 6px; opacity: 0.9; }
+            100% { width: 85%; height: 85%; opacity: 0; }
+        }
+
+        .cell.exploding {
+            animation: fieryExplosion 0.45s ease-out forwards;
+            z-index: 30;
+            pointer-events: none;
+        }
+        @keyframes fieryExplosion {
+            0% { background: #000000; }
+            30% { background: #ef4444; transform: scale(1.08); }
+            70% { background: #facc15; transform: scale(0.95); }
+            100% { background: radial-gradient(circle, #ef4444 0%, #b91c1c 55%, rgba(15,29,58,0) 85%); transform: scale(1); }
+        }
+
+        /* Панель состояния флота (Вариант А) */
+        .fleet-panel {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: clamp(275px, min(88vw, 48dvh), 400px);
+            max-width: 94vw;
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 14px;
+            padding: 8px 10px;
+            z-index: 20;
+            flex-shrink: 0;
+        }
+        .fleet-panel.visible {
+            display: flex;
+        }
+        .fleet-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            gap: 6px;
+        }
+        .fleet-side {
+            flex: 1;
+            min-width: 0;
+            background: rgba(30, 41, 59, 0.65);
+            border-radius: 10px;
+            padding: 5px 6px;
+            text-align: center;
+        }
+        .fleet-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .fleet-icons {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            font-size: 15px;
+        }
+        .ship-badge {
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .ship-badge.destroyed {
+            opacity: 0.25;
+            filter: grayscale(1);
+            transform: scale(0.88);
+        }
+
+        .swipe-toggle-btn {
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.45);
+            color: #7dd3fc;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: inherit;
+            width: 100%;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .swipe-toggle-btn:active {
+            transform: scale(0.97);
+            background: rgba(56, 189, 248, 0.25);
+        }
+        .swipe-toggle-btn:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        /* Стартовый экран и модальные окна */
+        .overlay-screen {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(10, 15, 30, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            padding: 20px;
+            text-align: center;
+        }
+        .overlay-screen.hidden {
+            display: none;
+        }
+        .modal-card {
+            background: #1e293b;
+            border: 2px solid #facc15;
+            padding: 26px 22px;
+            border-radius: 16px;
+            text-align: center;
+            width: 100%;
+            max-width: 340px;
+        }
+        .modal-card h2 {
+            color: #facc15;
+            font-size: 23px;
+            margin: 0 0 12px 0;
+        }
+        .modal-card p {
+            color: #e2e8f0;
+            font-size: 15px;
+            line-height: 1.5;
+            margin: 0 0 16px 0;
+        }
+        .modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn-gold {
+            background: linear-gradient(135deg, #ffe066 0%, #f5c518 50%, #ff9800 100%);
+            color: #10172b;
+            border: 2px solid #fff5b8;
+            padding: 13px 24px;
+            font-size: 16px;
+            font-weight: 900;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-gold:active { transform: scale(0.96); }
+
+        .btn-secondary {
+            background: rgba(15, 23, 42, 0.85);
+            color: #facc15;
+            border: 2px solid rgba(250, 204, 21, 0.55);
+            padding: 11px 24px;
+            font-size: 14px;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-secondary:active { transform: scale(0.96); }
+    </style>
+</head>
+<body>
+
+    <button id="music-btn" class="mute-btn left" title="Включить/выключить музыку">🎵</button>
+    <button id="sfx-btn" class="mute-btn right" title="Включить/выключить звуки">🔊</button>
+
+    <div class="top-bar">
+        <h1>Морской бой</h1>
+        <div id="game-subtitle" class="subtitle">Расставь свои корабли (нажми на корабль на поле, чтобы убрать)</div>
+    </div>
+
+    <div class="controls" id="setup-controls">
+        <div class="ship-buttons">
+            <button id="btn-frigate" class="game-btn">⛵ Фрегат (0/2)</button>
+            <button id="btn-boat" class="game-btn">🛶 Шлюпка (0/2)</button>
+        </div>
+        <button id="btn-rotate" class="game-btn">🔄 Повернуть: Гориз.</button>
+        <button id="btn-start" class="game-btn" disabled>В бой!</button>
+    </div>
+
+    <!-- Полноэкранный слой подзорной трубы с окуляром по центру поля -->
+    <div id="spyglass" class="spyglass-overlay"></div>
+
+    <div class="boards-container" id="boards-container">
+        <div class="board-wrapper active-board" id="player-wrapper">
+            <div class="board-title">ТВОЁ ПОЛЕ</div>
+            <div id="player-board" class="board"></div>
+        </div>
+        <div class="board-wrapper slide-right" id="enemy-wrapper">
+            <div class="board-title">ПОЛЕ ПРОТИВНИКА</div>
+            <div id="enemy-board" class="board"></div>
+        </div>
+    </div>
+
+    <!-- Нижняя панель состояния флота (Вариант А) -->
+    <div class="fleet-panel" id="fleet-panel">
+        <div class="fleet-row">
+            <div class="fleet-side">
+                <div class="fleet-label">Твой флот</div>
+                <div class="fleet-icons" id="player-fleet-icons">
+                    <span class="ship-badge" id="p-ship-0">⛵</span>
+                    <span class="ship-badge" id="p-ship-1">⛵</span>
+                    <span class="ship-badge" id="p-ship-2">🛶</span>
+                    <span class="ship-badge" id="p-ship-3">🛶</span>
+                </div>
+            </div>
+            <div class="fleet-side">
+                <div class="fleet-label">Флот врага</div>
+                <div class="fleet-icons" id="enemy-fleet-icons">
+                    <span class="ship-badge" id="e-ship-0">⛵</span>
+                    <span class="ship-badge" id="e-ship-1">⛵</span>
+                    <span class="ship-badge" id="e-ship-2">🛶</span>
+                    <span class="ship-badge" id="e-ship-3">🛶</span>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="swipe-toggle-btn" id="btn-toggle-view">↔ Свайп вправо: проверить свой флот</button>
+    </div>
+
+    <!-- Стартовый экран для активации аудио и вибрации -->
+    <div id="start-overlay" class="overlay-screen">
+        <div class="modal-card">
+            <h2>Морской бой ⚓</h2>
+            <p>Расставь 2 фрегата и 2 шлюпки, а затем разбей флот противника!</p>
+            <div class="modal-actions">
+                <button type="button" id="btn-init-start" class="btn-gold">Начать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Окно победы -->
+    <div id="win-modal" class="overlay-screen hidden">
+        <div class="modal-card">
+            <h2>Флот противника разбит! 🏆</h2>
+            <p><strong>Год 10</strong></p>
+            <p>Тебе целых 10 лет! Первый серьезный юбилей. Ты наш капитан, плыви навстречу своим мечтам, а мы всегда подставим плечо!</p>
+            <div class="modal-actions">
+                <button type="button" id="btn-next-quest" class="btn-gold">Дальше</button>
+                <button type="button" id="btn-play-again-win" class="btn-secondary">Играть ещё</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Окно поражения -->
+    <div id="lose-modal" class="overlay-screen hidden">
+        <div class="modal-card">
+            <h2 style="color: #ff4a6a;">Твой флот разбит! 🌊</h2>
+            <p>Противник оказался точнее в этот раз. Попробуй расставить корабли по-другому!</p>
+            <div class="modal-actions">
+                <button type="button" id="btn-play-again-lose" class="btn-gold">Попробовать снова</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BOARD_SIZE = 6;
+        const SHIP_TYPES = {
+            FRIGATE: { size: 2, max: 2, key: 'FRIGATE' },
+            BOAT: { size: 1, max: 2, key: 'BOAT' }
+        };
+
+        let playerBoard = [];
+        let enemyBoard = [];
+        let enemyHiddenBoard = [];
+        let playerShipsCoords = [];
+        let enemyShipsCoords = [];
+
+        let isHorizontal = true;
+        let selectedShipType = 'FRIGATE';
+        let placedShips = { FRIGATE: 0, BOAT: 0 };
+        let gamePhase = 'setup';
+        let isShooting = false;
+        let isTransitioning = false;
+        let isMusicMuted = false;
+        let isSfxMuted = false;
+        let sessionToken = 0;
+
+        const playerBoardEl = document.getElementById('player-board');
+        const enemyBoardEl = document.getElementById('enemy-board');
+        const playerWrapper = document.getElementById('player-wrapper');
+        const enemyWrapper = document.getElementById('enemy-wrapper');
+        const spyglassEl = document.getElementById('spyglass');
+        const subtitleEl = document.getElementById('game-subtitle');
+        const fleetPanelEl = document.getElementById('fleet-panel');
+        const toggleViewBtn = document.getElementById('btn-toggle-view');
+        const musicBtn = document.getElementById('music-btn');
+        const sfxBtn = document.getElementById('sfx-btn');
+        const columnsLabels = ['А', 'Б', 'В', 'Г', 'Д', 'Е'];
+
+        const playerCellsGrid = [];
+        const enemyCellsGrid = [];
+
+        // =========================================================
+        // 1. ВИБРООТКЛИК (ANDROID)
+        // =========================================================
+        function triggerHaptic(pattern) {
+            if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                try {
+                    navigator.vibrate(pattern);
+                } catch (e) {}
+            }
+        }
+
+        // =========================================================
+        // 2. ЦЕНТРОВКА ОКУЛЯРА ПОДЗОРНОЙ ТРУБЫ ПО ИГРОВЫМ ПОЛЯМ
+        // =========================================================
+        function updateSpyglassGeometry() {
+            const targetBoard = enemyWrapper.classList.contains('active-board') ? enemyBoardEl : playerBoardEl;
+            const rect = targetBoard.getBoundingClientRect();
+            if (!rect || rect.width <= 0) return;
+
+            const cx = Math.round(rect.left + rect.width / 2);
+            const cy = Math.round(rect.top + rect.height / 2);
+            const innerR = Math.round(rect.width * 0.49);
+            const outerR = innerR + 24;
+
+            spyglassEl.style.background = `radial-gradient(circle at ${cx}px ${cy}px, transparent ${innerR}px, rgba(0, 0, 0, 0.96) ${outerR}px, #000000 100%)`;
+        }
+
+        window.addEventListener('resize', updateSpyglassGeometry);
+        window.addEventListener('orientationchange', () => setTimeout(updateSpyglassGeometry, 120));
+
+        // =========================================================
+        // ТРЁХСТУПЕНЧАТЫЙ ПЛАВНЫЙ ПЕРЕХОД ПОДЗОРНОЙ ТРУБЫ
+        // 1. Появление окуляра -> 2. Перемещение поля -> 3. Растворение
+        // =========================================================
+        function switchBoardWithSpyglass(targetSide, newSubtitleText, onComplete) {
+            const currentSession = sessionToken;
+            isTransitioning = true;
+            updateToggleViewButton();
+
+            // Шаг 1: Сначала плавно проявляется окуляр подзорной трубы (поля пока стоят)
+            updateSpyglassGeometry();
+            spyglassEl.classList.add('active');
+
+            // Шаг 2 (через 550 мс): Окуляр уже появился — плавно двигаем поля внутри него
+            setTimeout(() => {
+                if (currentSession !== sessionToken) return;
+
+                if (targetSide === 'enemy') {
+                    playerWrapper.className = 'board-wrapper slide-left';
+                    enemyWrapper.className = 'board-wrapper active-board';
+                } else {
+                    enemyWrapper.className = 'board-wrapper slide-right';
+                    playerWrapper.className = 'board-wrapper active-board';
+                    renderPlayerFleet();
+                }
+
+                if (newSubtitleText) {
+                    subtitleEl.textContent = newSubtitleText;
+                }
+
+                // Шаг 3 (через 1300 мс после начала движения полей): Поле встало на место — растворяем окуляр
+                setTimeout(() => {
+                    if (currentSession !== sessionToken) return;
+                    updateSpyglassGeometry();
+                    spyglassEl.classList.remove('active');
+
+                    // Ждём завершения растворения окуляра (550 мс) и открываем управление
+                    setTimeout(() => {
+                        if (currentSession !== sessionToken) return;
+                        isTransitioning = false;
+                        updateToggleViewButton();
+                        if (typeof onComplete === 'function') onComplete();
+                    }, 550);
+                }, 1300);
+            }, 550);
+        }
+
+        // =========================================================
+        // 3. ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/) И ФОНОВАЯ МУЗЫКА
+        // =========================================================
+        const bgMusic = new Audio('../music/see_battle_1.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.35;
+        bgMusic.preload = 'auto';
+
+        function ensureBgMusicPlaying() {
+            if (isMusicMuted) return;
+            if (bgMusic.paused) {
+                bgMusic.play().catch(() => {});
+            }
+        }
+
+        const SOUND_URLS = {
+            shot: '../sounds/shot.mp3',
+            hit: '../sounds/hit.mp3',
+            miss: '../sounds/miss.mp3',
+            horn: '../sounds/horn.mp3'
+        };
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = AudioCtx ? new AudioCtx() : null;
+        const soundBuffers = { shot: null, hit: null, miss: null, horn: null };
+        const htmlAudioPool = {};
+        const isLocalFile = window.location.protocol === 'file:';
+        let audioUnlocked = false;
+
+        Object.keys(SOUND_URLS).forEach(key => {
+            const a = new Audio(SOUND_URLS[key]);
+            a.preload = 'auto';
+            htmlAudioPool[key] = a;
+        });
+
+        async function loadSoundBuffer(key, url) {
+            if (!audioCtx || isLocalFile) return;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                const arrayBuffer = await response.arrayBuffer();
+                soundBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+            } catch (e) {
+                soundBuffers[key] = null;
+            }
+        }
+
+        Object.keys(SOUND_URLS).forEach(key => loadSoundBuffer(key, SOUND_URLS[key]));
+
+        function unlockAudioEngine() {
+            ensureBgMusicPlaying();
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+
+            if (audioCtx) {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(() => {});
+                }
+                try {
+                    const buf = audioCtx.createBuffer(1, 1, 22050);
+                    const src = audioCtx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(audioCtx.destination);
+                    src.start(0);
+                } catch (e) {}
+            }
+        }
+
+        function playHtmlFallback(key, volume) {
+            const audio = htmlAudioPool[key];
+            if (!audio) return;
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+                audio.volume = volume;
+                audio.muted = isSfxMuted;
+                audio.play().catch(() => {});
+            } catch (e) {}
+        }
+
+        function playSound(key, volume = 0.7) {
+            if (isSfxMuted) return;
+            const buffer = soundBuffers[key];
+
+            if (audioCtx && buffer && !isLocalFile) {
+                const startBuf = () => {
+                    try {
+                        const src = audioCtx.createBufferSource();
+                        const gain = audioCtx.createGain();
+                        gain.gain.value = volume;
+                        src.buffer = buffer;
+                        src.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        src.start(audioCtx.currentTime + 0.01);
+                    } catch (e) {
+                        playHtmlFallback(key, volume);
+                    }
+                };
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(startBuf).catch(() => playHtmlFallback(key, volume));
+                } else {
+                    startBuf();
+                }
+            } else {
+                playHtmlFallback(key, volume);
+            }
+        }
+
+        function playShotAndWaitFlight(volume = 0.5, flightDelayMs = 1500) {
+            playSound('shot', volume);
+            return new Promise(resolve => setTimeout(resolve, flightDelayMs));
+        }
+
+        musicBtn.addEventListener('click', () => {
+            unlockAudioEngine();
+            isMusicMuted = !isMusicMuted;
+            musicBtn.textContent = isMusicMuted ? '🚫' : '🎵';
+            bgMusic.muted = isMusicMuted;
+            if (!isMusicMuted) ensureBgMusicPlaying();
+        });
+
+        sfxBtn.addEventListener('click', () => {
+            unlockAudioEngine();
+            isSfxMuted = !isSfxMuted;
+            sfxBtn.textContent = isSfxMuted ? '🔇' : '🔊';
+            Object.values(htmlAudioPool).forEach(a => { a.muted = isSfxMuted; });
+        });
+
+        // =========================================================
+        // 4. ЖЕСТЫ (СВАЙП И ТАП)
+        // =========================================================
+        let pointerStartX = 0;
+        let pointerStartY = 0;
+        let pointerActive = false;
+        let swipeHandled = false;
+        let activeTargetCell = null;
+
+        function setupGestures() {
+            const container = document.getElementById('boards-container');
+
+            container.addEventListener('pointerdown', (e) => {
+                unlockAudioEngine();
+                pointerStartX = e.clientX;
+                pointerStartY = e.clientY;
+                pointerActive = true;
+                swipeHandled = false;
+
+                const cellEl = e.target.closest('.cell');
+                activeTargetCell = cellEl || null;
+            });
+
+            container.addEventListener('pointermove', (e) => {
+                if (!pointerActive || swipeHandled) return;
+                const dx = e.clientX - pointerStartX;
+                const dy = e.clientY - pointerStartY;
+
+                if (Math.abs(dx) > 38 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+                    swipeHandled = true;
+                    activeTargetCell = null;
+                    handleSwipeGesture(dx);
+                }
+            });
+
+            container.addEventListener('pointerup', (e) => {
+                if (!pointerActive) return;
+                pointerActive = false;
+
+                const dx = e.clientX - pointerStartX;
+                const dy = e.clientY - pointerStartY;
+
+                if (!swipeHandled && Math.abs(dx) > 38 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+                    swipeHandled = true;
+                    activeTargetCell = null;
+                    handleSwipeGesture(dx);
+                    return;
+                }
+
+                if (!swipeHandled && activeTargetCell) {
+                    const row = parseInt(activeTargetCell.dataset.row, 10);
+                    const col = parseInt(activeTargetCell.dataset.col, 10);
+                    const boardType = activeTargetCell.dataset.board;
+                    activeTargetCell = null;
+
+                    if (boardType === 'player') {
+                        handlePlayerCellClick(row, col);
+                    } else if (boardType === 'enemy') {
+                        handleEnemyCellClick(row, col);
+                    }
+                }
+            });
+
+            container.addEventListener('pointercancel', () => {
+                pointerActive = false;
+                swipeHandled = false;
+                activeTargetCell = null;
+            });
+        }
+
+        function handleSwipeGesture(dx) {
+            if (gamePhase !== 'battle' || isShooting || isTransitioning) return;
+
+            if (dx > 0 && enemyWrapper.classList.contains('active-board')) {
+                switchToPlayerBoardView();
+            } else if (dx < 0 && playerWrapper.classList.contains('active-board')) {
+                switchToEnemyBoardView();
+            }
+        }
+
+        function switchToPlayerBoardView() {
+            if (gamePhase !== 'battle' || isShooting || isTransitioning) return;
+            triggerHaptic(25);
+            switchBoardWithSpyglass('player', 'Просмотр твоего флота. Свайпни влево для атаки.');
+        }
+
+        function switchToEnemyBoardView() {
+            if (gamePhase !== 'battle' || isShooting || isTransitioning) return;
+            triggerHaptic(25);
+            switchBoardWithSpyglass('enemy', 'Твой ход! Огонь по полю противника!');
+        }
+
+        function updateToggleViewButton() {
+            toggleViewBtn.disabled = isShooting || isTransitioning || gamePhase !== 'battle';
+            if (enemyWrapper.classList.contains('active-board')) {
+                toggleViewBtn.textContent = '↔ Свайп вправо: проверить свой флот';
+            } else {
+                toggleViewBtn.textContent = '↔ Свайп влево: вернуться в атаку';
+            }
+        }
+
+        toggleViewBtn.addEventListener('click', () => {
+            unlockAudioEngine();
+            if (gamePhase !== 'battle' || isShooting || isTransitioning) return;
+            if (enemyWrapper.classList.contains('active-board')) {
+                switchToPlayerBoardView();
+            } else {
+                switchToEnemyBoardView();
+            }
+        });
+
+        // =========================================================
+        // 5. ИНИЦИАЛИЗАЦИЯ И ИГРОВАЯ ЛОГИКА
+        // =========================================================
+        function buildGridsOnce() {
+            playerBoardEl.innerHTML = '';
+            enemyBoardEl.innerHTML = '';
+            playerCellsGrid.length = 0;
+            enemyCellsGrid.length = 0;
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                playerCellsGrid[r] = [];
+                enemyCellsGrid[r] = [];
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const pCell = createCellElement(r, c, 'player');
+                    playerBoardEl.appendChild(pCell);
+                    playerCellsGrid[r][c] = pCell;
+
+                    const eCell = createCellElement(r, c, 'enemy');
+                    enemyBoardEl.appendChild(eCell);
+                    enemyCellsGrid[r][c] = eCell;
+                }
+            }
+        }
+
+        function createCellElement(r, c, boardType) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.dataset.board = boardType;
+
+            if (r === 0) {
+                const colLabel = document.createElement('span');
+                colLabel.className = 'cell-coord coord-col';
+                colLabel.textContent = columnsLabels[c];
+                cell.appendChild(colLabel);
+            }
+            if (c === 0) {
+                const rowLabel = document.createElement('span');
+                rowLabel.className = 'cell-coord coord-row';
+                rowLabel.textContent = r + 1;
+                cell.appendChild(rowLabel);
+            }
+            return cell;
+        }
+
+        function initGame() {
+            sessionToken++;
+            playerBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(0));
+            enemyBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(0));
+            enemyHiddenBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(0));
+
+            playerShipsCoords = [];
+            enemyShipsCoords = [];
+
+            isHorizontal = true;
+            selectedShipType = 'FRIGATE';
+            placedShips = { FRIGATE: 0, BOAT: 0 };
+            gamePhase = 'setup';
+            isShooting = false;
+            isTransitioning = false;
+
+            document.getElementById('win-modal').classList.add('hidden');
+            document.getElementById('lose-modal').classList.add('hidden');
+            document.getElementById('setup-controls').style.display = 'flex';
+            fleetPanelEl.classList.remove('visible');
+            spyglassEl.classList.remove('active');
+
+            playerWrapper.className = 'board-wrapper active-board';
+            enemyWrapper.className = 'board-wrapper slide-right';
+            subtitleEl.textContent = 'Расставь свои корабли (нажми на корабль на поле, чтобы убрать)';
+            document.getElementById('btn-rotate').textContent = '🔄 Повернуть: Гориз.';
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    playerCellsGrid[r][c].className = 'cell';
+                    enemyCellsGrid[r][c].className = 'cell';
+                }
+            }
+
+            updateControls();
+            generateEnemyFleet();
+            setTimeout(updateSpyglassGeometry, 60);
+        }
+
+        function updateControls() {
+            const btnFrigate = document.getElementById('btn-frigate');
+            const btnBoat = document.getElementById('btn-boat');
+            const btnStart = document.getElementById('btn-start');
+
+            btnFrigate.textContent = `⛵ Фрегат (${placedShips.FRIGATE}/${SHIP_TYPES.FRIGATE.max})`;
+            btnBoat.textContent = `🛶 Шлюпка (${placedShips.BOAT}/${SHIP_TYPES.BOAT.max})`;
+
+            btnFrigate.style.borderColor = (selectedShipType === 'FRIGATE') ? '#facc15' : 'rgba(250, 204, 21, 0.35)';
+            btnBoat.style.borderColor = (selectedShipType === 'BOAT') ? '#facc15' : 'rgba(250, 204, 21, 0.35)';
+
+            btnFrigate.disabled = (placedShips.FRIGATE === SHIP_TYPES.FRIGATE.max);
+            btnBoat.disabled = (placedShips.BOAT === SHIP_TYPES.BOAT.max);
+
+            if (placedShips.FRIGATE === SHIP_TYPES.FRIGATE.max && placedShips.BOAT === SHIP_TYPES.BOAT.max) {
+                btnStart.disabled = false;
+                selectedShipType = null;
+                btnFrigate.style.borderColor = 'transparent';
+                btnBoat.style.borderColor = 'transparent';
+            } else {
+                btnStart.disabled = true;
+            }
+        }
+
+        function canPlaceShip(board, row, col, size, isHoriz) {
+            for (let i = 0; i < size; i++) {
+                const r = row + (isHoriz ? 0 : i);
+                const c = col + (isHoriz ? i : 0);
+                if (r >= BOARD_SIZE || c >= BOARD_SIZE) return false;
+
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const nr = r + dr;
+                        const nc = c + dc;
+                        if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                            if (board[nr][nc] !== 0) return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placeShip(board, row, col, size, isHoriz, id) {
+            const coords = [];
+            for (let i = 0; i < size; i++) {
+                const r = row + (isHoriz ? 0 : i);
+                const c = col + (isHoriz ? i : 0);
+                board[r][c] = id;
+                coords.push({ r, c });
+            }
+            return coords;
+        }
+
+        function generateEnemyFleet() {
+            let shipId = 1;
+            ['FRIGATE', 'BOAT'].forEach(type => {
+                const config = SHIP_TYPES[type];
+                for (let k = 0; k < config.max; k++) {
+                    let placed = false;
+                    while (!placed) {
+                        const r = Math.floor(Math.random() * BOARD_SIZE);
+                        const c = Math.floor(Math.random() * BOARD_SIZE);
+                        const horiz = Math.random() < 0.5;
+                        if (canPlaceShip(enemyHiddenBoard, r, c, config.size, horiz)) {
+                            const shipCoords = placeShip(enemyHiddenBoard, r, c, config.size, horiz, shipId++);
+                            enemyShipsCoords.push(shipCoords);
+                            placed = true;
+                        }
+                    }
+                }
+            });
+        }
+
+        function handlePlayerCellClick(row, col) {
+            if (gamePhase !== 'setup') return;
+
+            const existingShipId = playerBoard[row][col];
+            if (existingShipId !== 0) {
+                const shipIndex = playerShipsCoords.findIndex(ship =>
+                    ship.some(coord => coord.r === row && coord.c === col)
+                );
+                if (shipIndex !== -1) {
+                    const targetShip = playerShipsCoords[shipIndex];
+                    const typeKey = (targetShip.length === 2) ? 'FRIGATE' : 'BOAT';
+                    targetShip.forEach(coord => { playerBoard[coord.r][coord.c] = 0; });
+                    playerShipsCoords.splice(shipIndex, 1);
+                    placedShips[typeKey]--;
+                    if (!selectedShipType) selectedShipType = typeKey;
+                    triggerHaptic(20);
+                    renderPlayerFleet();
+                    updateControls();
+                }
+                return;
+            }
+
+            if (!selectedShipType) return;
+            const config = SHIP_TYPES[selectedShipType];
+            if (placedShips[selectedShipType] >= config.max) return;
+
+            if (canPlaceShip(playerBoard, row, col, config.size, isHorizontal)) {
+                const uniqueShipId = playerShipsCoords.length + 1;
+                const shipCoords = placeShip(playerBoard, row, col, config.size, isHorizontal, uniqueShipId);
+                playerShipsCoords.push(shipCoords);
+                placedShips[selectedShipType]++;
+                triggerHaptic(25);
+                renderPlayerFleet();
+
+                if (placedShips.FRIGATE === SHIP_TYPES.FRIGATE.max && placedShips.BOAT < SHIP_TYPES.BOAT.max) {
+                    selectedShipType = 'BOAT';
+                }
+                updateControls();
+            } else {
+                triggerHaptic([20, 40, 20]);
+            }
+        }
+
+        function renderPlayerFleet() {
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = playerCellsGrid[r][c];
+                    cell.className = 'cell';
+                    const status = playerBoard[r][c];
+                    if (status === 'miss') cell.classList.add('miss');
+                    if (status === 'hit') cell.classList.add('hit');
+                }
+            }
+
+            playerShipsCoords.forEach(ship => {
+                const firstCoord = ship[0];
+                const shipId = playerBoard[firstCoord.r][firstCoord.c];
+                const isSunk = ship.every(coord => playerBoard[coord.r][coord.c] === 'hit');
+
+                ship.forEach(coord => {
+                    const cell = playerCellsGrid[coord.r][coord.c];
+                    if (isSunk) {
+                        cell.classList.add('sunk');
+                    } else if (playerBoard[coord.r][coord.c] !== 'hit') {
+                        cell.classList.add('ship');
+                    }
+
+                    const hasSameRight  = coord.c + 1 < BOARD_SIZE && (playerBoard[coord.r][coord.c + 1] === shipId || playerBoard[coord.r][coord.c + 1] === 'hit');
+                    const hasSameLeft   = coord.c - 1 >= 0         && (playerBoard[coord.r][coord.c - 1] === shipId || playerBoard[coord.r][coord.c - 1] === 'hit');
+                    const hasSameBottom = coord.r + 1 < BOARD_SIZE && (playerBoard[coord.r + 1][coord.c] === shipId || playerBoard[coord.r + 1][coord.c] === 'hit');
+                    const hasSameTop    = coord.r - 1 >= 0         && (playerBoard[coord.r - 1][coord.c] === shipId || playerBoard[coord.r - 1][coord.c] === 'hit');
+
+                    if (hasSameRight) cell.classList.add('connect-right');
+                    if (hasSameLeft)  cell.classList.add('connect-left');
+                    if (hasSameBottom) cell.classList.add('connect-bottom');
+                    if (hasSameTop)    cell.classList.add('connect-top');
+
+                    if (!hasSameLeft && !hasSameRight && !hasSameTop && !hasSameBottom) cell.classList.add('round-all');
+                    else if (hasSameRight && !hasSameLeft) cell.classList.add('round-left');
+                    else if (hasSameLeft && !hasSameRight) cell.classList.add('round-right');
+                    else if (hasSameBottom && !hasSameTop) cell.classList.add('round-top');
+                    else if (hasSameTop && !hasSameBottom) cell.classList.add('round-bottom');
+                });
+            });
+        }
+
+        function updateFleetBadges() {
+            playerShipsCoords.forEach((ship, idx) => {
+                const isSunk = ship.every(coord => playerBoard[coord.r][coord.c] === 'hit');
+                const badge = document.getElementById('p-ship-' + idx);
+                if (badge) {
+                    badge.textContent = ship.length === 2 ? '⛵' : '🛶';
+                    badge.classList.toggle('destroyed', isSunk);
+                }
+            });
+
+            enemyShipsCoords.forEach((ship, idx) => {
+                const isSunk = ship.every(coord => enemyBoard[coord.r][coord.c] === 'hit');
+                const badge = document.getElementById('e-ship-' + idx);
+                if (badge) {
+                    badge.textContent = ship.length === 2 ? '⛵' : '🛶';
+                    badge.classList.toggle('destroyed', isSunk);
+                }
+            });
+        }
+
+        function surroundSunkShip(board, cellsGrid, shipCoords, isEnemyBoard) {
+            const sourceBoard = isEnemyBoard ? enemyHiddenBoard : playerBoard;
+            const firstCoord = shipCoords[0];
+            const shipId = sourceBoard[firstCoord.r][firstCoord.c];
+
+            shipCoords.forEach(coord => {
+                const cellEl = cellsGrid[coord.r][coord.c];
+                if (cellEl) {
+                    cellEl.classList.add('sunk');
+                    const hasSameRight  = coord.c + 1 < BOARD_SIZE && sourceBoard[coord.r][coord.c + 1] === shipId;
+                    const hasSameLeft   = coord.c - 1 >= 0         && sourceBoard[coord.r][coord.c - 1] === shipId;
+                    const hasSameBottom = coord.r + 1 < BOARD_SIZE && sourceBoard[coord.r + 1][coord.c] === shipId;
+                    const hasSameTop    = coord.r - 1 >= 0         && sourceBoard[coord.r - 1][coord.c] === shipId;
+
+                    if (hasSameRight) cellEl.classList.add('connect-right');
+                    if (hasSameLeft)  cellEl.classList.add('connect-left');
+                    if (hasSameBottom) cellEl.classList.add('connect-bottom');
+                    if (hasSameTop)    cellEl.classList.add('connect-top');
+
+                    if (!hasSameLeft && !hasSameRight && !hasSameTop && !hasSameBottom) cellEl.classList.add('round-all');
+                    else if (hasSameRight && !hasSameLeft) cellEl.classList.add('round-left');
+                    else if (hasSameLeft && !hasSameRight) cellEl.classList.add('round-right');
+                    else if (hasSameBottom && !hasSameTop) cellEl.classList.add('round-top');
+                    else if (hasSameTop && !hasSameBottom) cellEl.classList.add('round-bottom');
+                }
+
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const nr = coord.r + dr;
+                        const nc = coord.c + dc;
+                        if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                            if (board[nr][nc] === 0) {
+                                board[nr][nc] = 'miss';
+                                cellsGrid[nr][nc].classList.add('miss');
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!isEnemyBoard) renderPlayerFleet();
+            updateFleetBadges();
+        }
+
+        function checkAndProcessSunk(board, cellsGrid, shipsCoordsArray, isEnemyBoard) {
+            shipsCoordsArray.forEach(ship => {
+                const isSunk = ship.every(coord => board[coord.r][coord.c] === 'hit');
+                if (isSunk) {
+                    const firstCoord = ship[0];
+                    const firstCellEl = cellsGrid[firstCoord.r][firstCoord.c];
+                    if (firstCellEl && !firstCellEl.classList.contains('sunk')) {
+                        surroundSunkShip(board, cellsGrid, ship, isEnemyBoard);
+                    }
+                }
+            });
+        }
+
+        // =========================================================
+        // 6. ВЫСТРЕЛ ИГРОКА И ХОД БОТА (СТРОГО 1 ВЫСТРЕЛ У БОТА)
+        // =========================================================
+        async function handleEnemyCellClick(row, col) {
+            if (isShooting || isTransitioning) return;
+            if (gamePhase !== 'battle' || enemyBoard[row][col] !== 0 || enemyWrapper.classList.contains('slide-right')) return;
+
+            const currentSession = sessionToken;
+            isShooting = true;
+            updateToggleViewButton();
+
+            triggerHaptic(65);
+            const actualCell = enemyCellsGrid[row][col];
+
+            await playShotAndWaitFlight(0.5, 1500);
+            if (currentSession !== sessionToken) return;
+
+            if (enemyHiddenBoard[row][col] !== 0) {
+                // ПОПАДАНИЕ ИГРОКА (игрок продолжает стрелять)
+                enemyBoard[row][col] = 'hit';
+                playSound('hit', 0.8);
+                triggerHaptic([120, 40, 180]);
+
+                actualCell.classList.add('exploding');
+                enemyBoardEl.classList.add('shake');
+
+                setTimeout(() => {
+                    if (currentSession !== sessionToken) return;
+                    enemyBoardEl.classList.remove('shake');
+                    actualCell.classList.remove('exploding');
+                    actualCell.classList.add('hit');
+                }, 450);
+
+                checkAndProcessSunk(enemyBoard, enemyCellsGrid, enemyShipsCoords, true);
+
+                if (checkAllShipsDestroyed(enemyShipsCoords, enemyBoard)) {
+                    gamePhase = 'ended';
+                    updateToggleViewButton();
+                    setTimeout(() => {
+                        if (currentSession !== sessionToken) return;
+                        playSound('horn', 0.8);
+                        triggerHaptic([120, 60, 120, 60, 240]);
+                        document.getElementById('win-modal').classList.remove('hidden');
+                    }, 900);
+                } else {
+                    isShooting = false;
+                    updateToggleViewButton();
+                }
+            } else {
+                // ПРОМАХ ИГРОКА -> ПЕРЕХОД К ОДНОМУ ВЫСТРЕЛУ КОМПЬЮТЕРА
+                enemyBoard[row][col] = 'miss';
+                playSound('miss', 0.6);
+                actualCell.classList.add('miss');
+
+                gamePhase = 'enemy-turn';
+
+                // Небольшая пауза чтобы увидеть всплеск промаха, затем плавный 3-шаговый переход трубы
+                setTimeout(() => {
+                    if (currentSession !== sessionToken) return;
+                    switchBoardWithSpyglass('player', 'Ход компьютера... Обороняйся!', () => {
+                        setTimeout(() => {
+                            if (currentSession !== sessionToken) return;
+                            enemyTurn();
+                        }, 350);
+                    });
+                }, 900);
+            }
+        }
+
+        async function enemyTurn() {
+            if (gamePhase !== 'enemy-turn') return;
+            const currentSession = sessionToken;
+
+            let validMove = false;
+            let r = 0, c = 0;
+            while (!validMove) {
+                r = Math.floor(Math.random() * BOARD_SIZE);
+                c = Math.floor(Math.random() * BOARD_SIZE);
+                if (playerBoard[r][c] !== 'hit' && playerBoard[r][c] !== 'miss') validMove = true;
+            }
+
+            isShooting = true;
+            updateToggleViewButton();
+            const cell = playerCellsGrid[r][c];
+
+            await playShotAndWaitFlight(0.5, 1500);
+            if (currentSession !== sessionToken) return;
+
+            if (playerBoard[r][c] !== 0 && playerBoard[r][c] !== 'miss') {
+                // БОТ ПОПАЛ (но стреляет строго 1 раз за ход!)
+                playSound('hit', 0.8);
+                triggerHaptic([120, 40, 180]);
+                playerBoard[r][c] = 'hit';
+
+                cell.classList.add('exploding');
+                playerBoardEl.classList.add('shake');
+
+                setTimeout(() => {
+                    if (currentSession !== sessionToken) return;
+                    playerBoardEl.classList.remove('shake');
+                    cell.classList.remove('exploding');
+                    cell.classList.add('hit');
+                }, 450);
+
+                checkAndProcessSunk(playerBoard, playerCellsGrid, playerShipsCoords, false);
+
+                if (checkAllShipsDestroyed(playerShipsCoords, playerBoard)) {
+                    gamePhase = 'ended';
+                    isShooting = false;
+                    updateToggleViewButton();
+                    setTimeout(() => {
+                        if (currentSession !== sessionToken) return;
+                        triggerHaptic([200, 100, 200]);
+                        document.getElementById('lose-modal').classList.remove('hidden');
+                    }, 900);
+                    return;
+                }
+            } else {
+                // БОТ ПРОМАХНУЛСЯ
+                playSound('miss', 0.6);
+                playerBoard[r][c] = 'miss';
+                cell.classList.add('miss');
+            }
+
+            // После любого одного выстрела бота возвращаем ход игроку через плавный 3-шаговый переход трубы
+            setTimeout(() => {
+                if (currentSession !== sessionToken) return;
+                switchBoardWithSpyglass('enemy', 'Твой ход! Огонь по полю противника!', () => {
+                    gamePhase = 'battle';
+                    isShooting = false;
+                    updateToggleViewButton();
+                });
+            }, 1100);
+        }
+
+        function checkAllShipsDestroyed(shipsCoords, trackingBoard) {
+            return shipsCoords.every(ship =>
+                ship.every(coord => trackingBoard[coord.r][coord.c] === 'hit')
+            );
+        }
+
+        // =========================================================
+        // 7. КНОПКИ УПРАВЛЕНИЯ И ЗАПУСКА
+        // =========================================================
+        document.getElementById('btn-init-start').addEventListener('click', () => {
+            unlockAudioEngine();
+            triggerHaptic(30);
+            document.getElementById('start-overlay').classList.add('hidden');
+            setTimeout(updateSpyglassGeometry, 60);
+        });
+
+        document.getElementById('btn-frigate').addEventListener('click', () => {
+            unlockAudioEngine();
+            if (placedShips.FRIGATE < SHIP_TYPES.FRIGATE.max) {
+                selectedShipType = 'FRIGATE';
+                triggerHaptic(15);
+                updateControls();
+            }
+        });
+
+        document.getElementById('btn-boat').addEventListener('click', () => {
+            unlockAudioEngine();
+            if (placedShips.BOAT < SHIP_TYPES.BOAT.max) {
+                selectedShipType = 'BOAT';
+                triggerHaptic(15);
+                updateControls();
+            }
+        });
+
+        document.getElementById('btn-rotate').addEventListener('click', () => {
+            unlockAudioEngine();
+            isHorizontal = !isHorizontal;
+            triggerHaptic(15);
+            document.getElementById('btn-rotate').textContent = `🔄 Повернуть: ${isHorizontal ? 'Гориз.' : 'Верт.'}`;
+        });
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            unlockAudioEngine();
+            triggerHaptic(35);
+            gamePhase = 'battle';
+            isShooting = true;
+            document.getElementById('setup-controls').style.display = 'none';
+            fleetPanelEl.classList.add('visible');
+            updateFleetBadges();
+
+            // Плавный 3-шаговый переход на поле противника в начале боя
+            setTimeout(() => {
+                switchBoardWithSpyglass('enemy', 'Твой ход! Огонь по полю противника!', () => {
+                    isShooting = false;
+                    updateToggleViewButton();
+                });
+            }, 60);
+        });
+
+        document.getElementById('btn-next-quest').addEventListener('click', () => {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+            }
+        });
+
+        document.getElementById('btn-play-again-win').addEventListener('click', () => {
+            unlockAudioEngine();
+            initGame();
+        });
+
+        document.getElementById('btn-play-again-lose').addEventListener('click', () => {
+            unlockAudioEngine();
+            initGame();
+        });
+
+        buildGridsOnce();
+        setupGestures();
+        initGame();
+    </script>
+</body>
+</html>

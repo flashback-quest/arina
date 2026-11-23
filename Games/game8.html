@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Игра 8: Сортировка букетов</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: radial-gradient(circle at 50% 30%, #1e2a4a 0%, #0a0f1e 70%, #05070f 100%);
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+    padding: 12px 15px;
+    touch-action: manipulation;
+  }
+
+  .mute-btn {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 250;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .mute-btn:active { transform: scale(0.9) translateZ(0); }
+
+  .main-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-height: 0;
+    padding-top: 6px;
+  }
+
+  h2 {
+    margin-bottom: 4px;
+    font-size: 20px;
+    font-weight: 900;
+    color: #f5c518;
+    text-align: center;
+    padding: 0 36px;
+  }
+
+  #status {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a9eff;
+    text-align: center;
+    min-height: 18px;
+    transition: color 0.3s ease;
+  }
+
+  #game-board {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    width: 100%;
+    max-width: 400px;
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .shelf {
+    position: relative;
+    height: 22%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.4) 100%);
+    border-bottom: 5px solid rgba(245, 197, 24, 0.4);
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    padding-bottom: 2px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+    z-index: 1;
+    overflow: visible;
+    transition: border-color 0.6s ease, box-shadow 0.6s ease, background 0.6s ease;
+  }
+
+  .shelf.magic-win {
+    border-bottom-color: #ffe066;
+    background: linear-gradient(to bottom, rgba(255, 224, 102, 0.16) 0%, rgba(245, 197, 24, 0.08) 60%, rgba(0,0,0,0.35) 100%);
+    box-shadow: 0 6px 22px rgba(245, 197, 24, 0.45), inset 0 -4px 16px rgba(255, 224, 102, 0.25);
+  }
+
+  .slot {
+    width: 22%;
+    height: 95%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.18);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+    touch-action: manipulation;
+    transition: opacity 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
+  }
+
+  .bouquet {
+    width: 100%;
+    height: 95%;
+    will-change: transform, filter;
+    transform: translateZ(0);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s, filter 0.5s ease;
+    transform-origin: bottom center;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .slot.selected .bouquet {
+    transform: translate3d(0, -24%, 0) scale(1.1);
+  }
+
+  .slot.selected {
+    background: rgba(245, 197, 24, 0.16);
+    box-shadow: inset 0 0 0 2px rgba(245, 197, 24, 0.7);
+  }
+
+  .slot.blocked {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /* Волшебное парение волной и яркое свечение всех букетов при победе */
+  .slot.magic-glow {
+    opacity: 1 !important;
+    cursor: default;
+    background: radial-gradient(circle at 50% 60%, rgba(255, 230, 120, 0.26) 0%, rgba(245, 197, 24, 0.06) 70%, transparent 100%);
+    box-shadow: inset 0 0 12px rgba(255, 224, 102, 0.35);
+  }
+
+  .slot.magic-glow .bouquet {
+    opacity: 1 !important;
+    animation: bouquet-magic-wave 2.4s ease-in-out infinite;
+    animation-delay: var(--wave-delay, 0s);
+  }
+
+  @keyframes bouquet-magic-wave {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+      filter: drop-shadow(0 0 6px rgba(255, 224, 102, 0.65)) drop-shadow(0 0 14px rgba(245, 197, 24, 0.45)) brightness(1.06);
+    }
+    35% {
+      transform: translate3d(0, -11%, 0) rotate(-2.2deg) scale(1.06);
+      filter: drop-shadow(0 0 12px rgba(255, 245, 175, 0.95)) drop-shadow(0 0 24px rgba(255, 190, 40, 0.8)) brightness(1.2);
+    }
+    70% {
+      transform: translate3d(0, -4%, 0) rotate(1.8deg) scale(1.02);
+      filter: drop-shadow(0 0 8px rgba(255, 232, 130, 0.8)) drop-shadow(0 0 18px rgba(245, 197, 24, 0.6)) brightness(1.12);
+    }
+  }
+
+  /* Волшебная пыльца (светящиеся точечки) */
+  #magic-pollen-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 150;
+    overflow: hidden;
+  }
+
+  .magic-pollen {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: pollen-drift var(--dur, 2.6s) ease-in-out forwards;
+  }
+
+  @keyframes pollen-drift {
+    0% {
+      transform: translate3d(0, 0, 0) scale(0.3);
+      opacity: 0;
+    }
+    20% {
+      transform: translate3d(var(--sway1, 8px), calc(var(--rise, -90px) * 0.25), 0) scale(1.1);
+      opacity: 1;
+    }
+    55% {
+      transform: translate3d(var(--sway2, -10px), calc(var(--rise, -90px) * 0.62), 0) scale(0.95);
+      opacity: 0.9;
+    }
+    85% {
+      transform: translate3d(var(--sway3, 6px), calc(var(--rise, -90px) * 0.88), 0) scale(0.75);
+      opacity: 0.55;
+    }
+    100% {
+      transform: translate3d(var(--sway3, 6px), var(--rise, -90px), 0) scale(0.2);
+      opacity: 0;
+    }
+  }
+
+  .shake { animation: shake 0.38s cubic-bezier(.36,.07,.19,.97) both; }
+  @keyframes shake {
+    10%, 90% { transform: translate3d(-2px, 0, 0); }
+    20%, 80% { transform: translate3d(4px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #f5c518, #ff9800);
+    color: #10172b;
+    border: none;
+    padding: 13px 32px;
+    font-size: 16px;
+    font-weight: 900;
+    font-family: inherit;
+    border-radius: 50px;
+    cursor: pointer;
+    z-index: 100;
+    box-shadow: 0 6px 16px rgba(245,197,24,0.35);
+    flex-shrink: 0;
+    margin-bottom: 4px;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+    touch-action: manipulation;
+  }
+  .btn:active { transform: scale(0.95) translateZ(0); }
+
+  .btn-next {
+    background: linear-gradient(135deg, #ffe066 0%, #f5c518 50%, #ff9800 100%);
+    border: 2px solid #fff5b8;
+    padding: 14px 42px;
+    font-size: 17px;
+    margin-bottom: 10px;
+  }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: none;
+    padding: 11px 28px;
+    font-size: 14px;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 30, 0.96);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    text-align: center;
+    padding: 20px;
+  }
+  .overlay.active { display: flex; }
+  .overlay h3 {
+    color: #f5c518;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 14px;
+    z-index: 10;
+  }
+  .overlay p {
+    font-size: 16px;
+    margin-bottom: 22px;
+    line-height: 1.5;
+    max-width: 320px;
+    color: #fff;
+    z-index: 10;
+  }
+
+  .win-photo {
+    width: min(56vw, 190px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #f5c518;
+    box-shadow: 0 0 24px rgba(245,197,24,0.45);
+    margin-bottom: 18px;
+    z-index: 10;
+    animation: pulse-photo 2s infinite;
+  }
+  @keyframes pulse-photo {
+    0%, 100% { transform: scale(1) translateZ(0); }
+    50% { transform: scale(1.04) translateZ(0); }
+  }
+
+  .win-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+  }
+
+  #fireworks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1;
+  }
+  .firework-particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .firework-particle.burst {
+    animation: firework-burst 1.4s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+  }
+  @keyframes firework-burst {
+    0% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+    100% { transform: translate3d(var(--dx), var(--dy), 0) scale(0.2); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <button id="mute-btn" class="mute-btn" title="Включить/выключить звук">🔊</button>
+  <div id="magic-pollen-layer"></div>
+
+  <div class="main-content">
+    <h2>Сортировка букетов</h2>
+    <div id="status">Собери 4 одинаковых букета на одной полке!</div>
+    <div id="game-board"></div>
+  </div>
+
+  <button class="btn" id="restart-btn">Начать заново</button>
+
+  <div id="start-screen" class="overlay active">
+    <h3>Сортировка букетов</h3>
+    <p>Переставляй крайние правые букеты на пустые места к таким же букетам или на пустую полку, чтобы собрать по 4 одинаковых на каждой полке!</p>
+    <button class="btn" id="start-btn">Начать</button>
+  </div>
+
+  <div id="win-screen" class="overlay">
+    <div id="fireworks"></div>
+    <h3>Идеальные букеты! 🎉</h3>
+    <img class="win-photo" src="../photos/photo8_1.jpg" alt="Год 8" onerror="this.style.display='none'">
+    <p>В 8 лет ты тянулась к прекрасному. Твои первые увлечения были полны творчества и ярких красок! Расти такой же вдохновленной!</p>
+    <div class="win-buttons">
+      <button class="btn btn-next" id="next-btn">Дальше</button>
+      <button class="btn btn-secondary" id="play-again-btn">Играть ещё</button>
+    </div>
+  </div>
+
+  <script>
+    const BOUQUET_TYPES = {
+      'A': { top: 'rose', left: 'tulip', right: 'daisy' },
+      'B': { top: 'tulip', left: 'daisy', right: 'rose' },
+      'C': { top: 'daisy', left: 'rose', right: 'tulip' }
+    };
+
+    const WRAPPER_COLORS = [
+      '#ff4d6d', '#00b4d8', '#9d4edd', '#ff9e00', '#06d6a0', '#ff007f', '#00f5d4'
+    ];
+
+    const INITIAL_STATE_TYPES = [
+      ['A', 'B', 'C', 'A'],
+      ['B', 'C', 'A', 'B'],
+      ['C', 'A', 'B', 'C'],
+      [null, null, null, null]
+    ];
+
+    let shelves = [];
+    let selectedShelf = -1;
+    let selectedSlot = -1;
+    let isAnimating = false;
+    let isGameOver = false;
+    let isMuted = false;
+    let gameSessionId = 0;
+    let magicPollenTimer = null;
+
+    const boardEl = document.getElementById('game-board');
+    const statusEl = document.getElementById('status');
+    const winScreen = document.getElementById('win-screen');
+    const startScreen = document.getElementById('start-screen');
+    const muteBtn = document.getElementById('mute-btn');
+    const pollenLayer = document.getElementById('magic-pollen-layer');
+
+    // =========================================================
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/ + СКАЗОЧНЫЙ ПЕРЕЛИВ)
+    // =========================================================
+    const soundFiles = {
+      click: '../sounds/click.mp3',
+      error: '../sounds/krestik2.mp3',
+      win: '../sounds/win3.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const soundBuffers = { click: null, error: null, win: null };
+    const htmlAudioPool = {};
+    const isLocalFile = window.location.protocol === 'file:';
+    let isAudioUnlocked = false;
+    let activeMagicNodes = [];
+
+    // =========================================================
+    // ФОНОВАЯ МУЗЫКА (../music/kalambur_bukety.mp3)
+    // =========================================================
+    const bgMusic = new Audio('../music/kalambur_bukety.mp3');
+    bgMusic.loop = true;
+    bgMusic.preload = 'auto';
+    const BG_MUSIC_BASE_VOLUME = 0.35;
+    bgMusic.volume = BG_MUSIC_BASE_VOLUME;
+    let bgMusicStarted = false;
+
+    function startBgMusic() {
+      if (isMuted) return;
+      bgMusic.muted = false;
+      if (bgMusic.paused) {
+        bgMusic.play().then(() => {
+          bgMusicStarted = true;
+        }).catch(() => {});
+      }
+    }
+
+    function pauseBgMusic() {
+      try {
+        bgMusic.pause();
+      } catch (e) {}
+    }
+
+    Object.keys(soundFiles).forEach(key => {
+      const a = new Audio(soundFiles[key]);
+      a.preload = 'auto';
+      htmlAudioPool[key] = a;
+    });
+
+    async function loadSoundBuffer(key, url) {
+      if (!audioCtx || isLocalFile) return;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const arrayBuffer = await response.arrayBuffer();
+        soundBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        soundBuffers[key] = null;
+      }
+    }
+
+    Object.keys(soundFiles).forEach(key => loadSoundBuffer(key, soundFiles[key]));
+
+    function unlockAudioEngine() {
+      if (!isAudioUnlocked) {
+        isAudioUnlocked = true;
+        if (audioCtx) {
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
+          try {
+            const buffer = audioCtx.createBuffer(1, 1, 22050);
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start(0);
+          } catch (e) {}
+        }
+      }
+      if (!isMuted && !isGameOver) {
+        startBgMusic();
+      }
+    }
+
+    function playHtmlAudioFallback(key, volume) {
+      const audio = htmlAudioPool[key];
+      if (!audio) return;
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = volume;
+        audio.muted = isMuted;
+        audio.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    function playSoundHybrid(key, volume = 0.6) {
+      if (isMuted) return;
+      const buffer = soundBuffers[key];
+      if (audioCtx && buffer && !isLocalFile) {
+        const startBuffer = () => {
+          try {
+            const source = audioCtx.createBufferSource();
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.value = volume;
+            source.buffer = buffer;
+            source.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            source.start(audioCtx.currentTime + 0.005);
+          } catch (e) {
+            playHtmlAudioFallback(key, volume);
+          }
+        };
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(startBuffer).catch(() => playHtmlAudioFallback(key, volume));
+        } else {
+          startBuffer();
+        }
+      } else {
+        playHtmlAudioFallback(key, volume);
+      }
+    }
+
+    function stopMagicSound() {
+      activeMagicNodes.forEach(node => {
+        try { node.stop(); } catch (e) {}
+        try { node.disconnect(); } catch (e) {}
+      });
+      activeMagicNodes = [];
+    }
+
+    // Многослойный сказочный звук (арфа, мерцающие звёздочки, тёплый аккорд и эхо)
+    function playMagicSparkleSound() {
+      if (isMuted || !audioCtx) return;
+      stopMagicSound();
+
+      const runMagic = () => {
+        try {
+          const now = audioCtx.currentTime + 0.02;
+
+          const masterGain = audioCtx.createGain();
+          masterGain.gain.setValueAtTime(0.001, now);
+          masterGain.gain.linearRampToValueAtTime(0.24, now + 0.45);
+          masterGain.gain.setValueAtTime(0.24, now + 3.8);
+          masterGain.gain.exponentialRampToValueAtTime(0.0008, now + 4.95);
+          masterGain.connect(audioCtx.destination);
+
+          const delay = audioCtx.createDelay();
+          delay.delayTime.value = 0.34;
+          const feedback = audioCtx.createGain();
+          feedback.gain.value = 0.44;
+          const echoFilter = audioCtx.createBiquadFilter();
+          echoFilter.type = 'lowpass';
+          echoFilter.frequency.value = 2600;
+
+          delay.connect(echoFilter);
+          echoFilter.connect(feedback);
+          feedback.connect(delay);
+          echoFilter.connect(masterGain);
+
+          const padFilter = audioCtx.createBiquadFilter();
+          padFilter.type = 'lowpass';
+          padFilter.frequency.setValueAtTime(520, now);
+          padFilter.frequency.exponentialRampToValueAtTime(1650, now + 2.4);
+          padFilter.frequency.exponentialRampToValueAtTime(750, now + 4.8);
+          padFilter.connect(masterGain);
+
+          const padNotes = [261.63, 329.63, 392.00, 493.88, 587.33];
+          padNotes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.detune.setValueAtTime((idx - 2) * 5, now);
+
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.linearRampToValueAtTime(0.055, now + 0.8 + idx * 0.12);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + 4.85);
+
+            osc.connect(g);
+            g.connect(padFilter);
+            osc.start(now);
+            osc.stop(now + 4.95);
+            activeMagicNodes.push(osc);
+          });
+
+          const harpNotes = [
+            523.25, 659.25, 783.99, 987.77, 1174.66, 1318.51, 1567.98, 1975.53,
+            2349.32, 2093.00, 1760.00, 1567.98, 1975.53, 2349.32, 2637.02, 3135.96
+          ];
+
+          harpNotes.forEach((freq, i) => {
+            const t = now + 0.08 + i * 0.24;
+            const osc = audioCtx.createOscillator();
+            const shimmer = audioCtx.createOscillator();
+            const noteGain = audioCtx.createGain();
+            const shimmerGain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+
+            shimmer.type = 'sine';
+            shimmer.frequency.setValueAtTime(freq * 2, t);
+
+            noteGain.gain.setValueAtTime(0.0001, t);
+            noteGain.gain.linearRampToValueAtTime(0.11, t + 0.035);
+            noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.35);
+
+            shimmerGain.gain.setValueAtTime(0.0001, t);
+            shimmerGain.gain.linearRampToValueAtTime(0.025, t + 0.02);
+            shimmerGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+
+            osc.connect(noteGain);
+            shimmer.connect(shimmerGain);
+            shimmerGain.connect(noteGain);
+
+            noteGain.connect(masterGain);
+            noteGain.connect(delay);
+
+            osc.start(t);
+            osc.stop(t + 1.45);
+            shimmer.start(t);
+            shimmer.stop(t + 0.75);
+            activeMagicNodes.push(osc, shimmer);
+          });
+
+          const dustFreqs = [2637.02, 3135.96, 3520.00, 3951.07, 4186.01, 4698.63];
+          for (let k = 0; k < 14; k++) {
+            const t = now + 0.35 + k * 0.31;
+            const f = dustFreqs[k % dustFreqs.length];
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, t);
+            osc.frequency.exponentialRampToValueAtTime(f * 1.03, t + 0.35);
+
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime(0.038, t + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+
+            osc.connect(g);
+            g.connect(masterGain);
+            g.connect(delay);
+
+            osc.start(t);
+            osc.stop(t + 0.45);
+            activeMagicNodes.push(osc);
+          }
+        } catch (e) {}
+      };
+
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(runMagic).catch(() => {});
+      } else {
+        runMagic();
+      }
+    }
+
+    function stopAllSounds() {
+      stopMagicSound();
+      Object.values(htmlAudioPool).forEach(a => {
+        try { a.pause(); a.currentTime = 0; } catch (e) {}
+      });
+    }
+
+    function triggerHaptic(pattern) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+      }
+    }
+
+    // =========================================================
+    // ГЕНЕРАЦИЯ SVG БУКЕТОВ (ОРИГИНАЛЬНАЯ ГРАФИКА)
+    // =========================================================
+    function getRoseSVG(x, y) {
+      return `
+        <g transform="translate(${x}, ${y})">
+          <circle r="12" fill="#e01b3c" />
+          <path d="M -10,-4 Q -12,-12 0,-12 Q 12,-12 10,-4 Q 8,6 -8,6 Q -12,4 -10,-4 Z" fill="#b3001e" opacity="0.8"/>
+          <path d="M -5,1 Q -6,-3 -1,-4 Q 3,-5 4,-1 Q 5,4 1,5 Q -3,6 -5,1 Z" fill="#ff4a6a"/>
+          <path d="M -2,0 Q -2,-2 0,-2 Q 2,-2 2,0 Q 2,2 0,2 Q -2,2 -2,0 Z" fill="#b3001e"/>
+        </g>
+      `;
+    }
+
+    function getTulipSVG(x, y) {
+      return `
+        <g transform="translate(${x}, ${y})">
+          <path d="M -8,-5 C -12,8 -6,15 0,15 C 6,15 12,8 8,-5 C 4,-2 2,-8 0,-12 C -2,-8 -4,-2 -8,-5 Z" fill="#ffcc00" stroke="#cc9900" stroke-width="1.5"/>
+          <path d="M -6,0 C -4,8 -2,12 0,14" fill="none" stroke="#cc9900" stroke-width="1" opacity="0.6"/>
+          <path d="M 6,0 C 4,8 2,12 0,14" fill="none" stroke="#cc9900" stroke-width="1" opacity="0.6"/>
+          <path d="M -4,2 Q -2,8 0,10" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+        </g>
+      `;
+    }
+
+    function getDaisySVG(x, y) {
+      let petals = '';
+      for (let i = 0; i < 12; i++) {
+        petals += `<ellipse cx="0" cy="-10" rx="2.5" ry="7" fill="#ffffff" stroke="#d0d0d0" stroke-width="0.5" transform="rotate(${i * 30})" />`;
+      }
+      return `
+        <g transform="translate(${x}, ${y})">
+          ${petals}
+          <circle r="5" fill="#4a9eff" stroke="#003d8f" stroke-width="1"/>
+          <circle r="2" fill="#ffffff" opacity="0.8"/>
+        </g>
+      `;
+    }
+
+    function createBouquetSVG(item) {
+      const config = BOUQUET_TYPES[item.type];
+      const wrapperColor = item.color;
+
+      const getFlower = (flowerType, x, y) => {
+        if (flowerType === 'rose') return getRoseSVG(x, y);
+        if (flowerType === 'tulip') return getTulipSVG(x, y);
+        return getDaisySVG(x, y);
+      };
+
+      return `
+        <svg class="bouquet" viewBox="0 0 80 100" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="15" x2="40" y2="90" stroke="#388e3c" stroke-width="3" stroke-linecap="round"/>
+          <line x1="25" y1="35" x2="35" y2="90" stroke="#4caf50" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="55" y1="35" x2="45" y2="90" stroke="#4caf50" stroke-width="2.5" stroke-linecap="round"/>
+
+          <polygon points="15,50 65,50 40,95" fill="${wrapperColor}" stroke="rgba(0,0,0,0.3)" stroke-width="1.5"/>
+          <polygon points="40,50 65,50 40,95" fill="rgba(0,0,0,0.2)" />
+          <polygon points="20,50 30,50 40,70" fill="#ffffff" opacity="0.5"/>
+          <path d="M 40,50 L 40,95" stroke="rgba(0,0,0,0.2)" stroke-width="1"/>
+
+          ${getFlower(config.top, 40, 15)}
+          ${getFlower(config.left, 25, 35)}
+          ${getFlower(config.right, 55, 35)}
+        </svg>
+      `;
+    }
+
+    // =========================================================
+    // РЕШАТЕЛЬ + ОЦЕНКА СЛОЖНОСТИ (СНИЖЕНИЕ СЛОЖНОСТИ НА ~20%)
+    // =========================================================
+    // Возвращает минимальное число ходов до победы (или -1, если тупик)
+    function getMinMovesToSolve(typeRows) {
+      const startState = typeRows.map(row => row.filter(x => x !== null));
+
+      const isGoal = (state) => {
+        for (let i = 0; i < 4; i++) {
+          const s = state[i];
+          if (s.length > 0) {
+            if (s.length !== 4) return false;
+            if (s[0] !== s[1] || s[1] !== s[2] || s[2] !== s[3]) return false;
+          }
+        }
+        return true;
+      };
+
+      const serialize = (state) => {
+        const parts = [
+          state[0].join(''),
+          state[1].join(''),
+          state[2].join(''),
+          state[3].join('')
+        ];
+        parts.sort();
+        return parts.join('|');
+      };
+
+      if (isGoal(startState)) return 0;
+
+      const visited = new Set([serialize(startState)]);
+      const queue = [{ state: startState, dist: 0 }];
+      let head = 0;
+
+      while (head < queue.length) {
+        const { state: curr, dist } = queue[head++];
+
+        for (let from = 0; from < 4; from++) {
+          const fromShelf = curr[from];
+          if (fromShelf.length === 0) continue;
+
+          if (
+            fromShelf.length === 4 &&
+            fromShelf[0] === fromShelf[1] &&
+            fromShelf[1] === fromShelf[2] &&
+            fromShelf[2] === fromShelf[3]
+          ) {
+            continue;
+          }
+
+          const movingItem = fromShelf[fromShelf.length - 1];
+          let movedToEmpty = false;
+
+          for (let to = 0; to < 4; to++) {
+            if (from === to) continue;
+            const toShelf = curr[to];
+            if (toShelf.length >= 4) continue;
+
+            if (toShelf.length === 0) {
+              if (fromShelf.every(x => x === movingItem)) continue;
+              if (movedToEmpty) continue;
+              movedToEmpty = true;
+            } else if (toShelf[toShelf.length - 1] !== movingItem) {
+              continue;
+            }
+
+            const next = [
+              curr[0].slice(),
+              curr[1].slice(),
+              curr[2].slice(),
+              curr[3].slice()
+            ];
+            next[to].push(next[from].pop());
+
+            if (isGoal(next)) return dist + 1;
+
+            const key = serialize(next);
+            if (!visited.has(key)) {
+              visited.add(key);
+              queue.push({ state: next, dist: dist + 1 });
+            }
+          }
+        }
+      }
+
+      return -1;
+    }
+
+    // =========================================================
+    // ЛОГИКА ИГРЫ (ЛЁГКАЯ РАСКЛАДКА НА 4 ПОЛКАХ: -20% СЛОЖНОСТИ)
+    // =========================================================
+    function padShelf(shelf) {
+      while (shelf.length < 4) shelf.push(null);
+    }
+
+    // Считает количество соседних пар одинаковых букетов на полках
+    function countAdjacentPairs(rows) {
+      let pairs = 0;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          if (rows[r][c] && rows[r][c] === rows[r][c + 1]) {
+            pairs++;
+          }
+        }
+      }
+      return pairs;
+    }
+
+    function generateShuffledTypes() {
+      const pool = ['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B', 'C', 'C', 'C', 'C'];
+      let result = [];
+      let fallbackResult = null;
+      let attempts = 0;
+
+      // Стандартная случайная раскладка решается в среднем за 11-13 ходов и почти не имеет готовых пар.
+      // Чтобы снизить сложность на ~20% на тех же 4 полках:
+      // 1) Отбираем раскладки с 2-4 соседними одинаковыми букетами уже на старте
+      // 2) Ограничиваем оптимальную длину решения диапазоном 7..10 ходов (без запутанных ловушек)
+      while (attempts < 4000) {
+        attempts++;
+        const arr = [...pool];
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        result = [
+          arr.slice(0, 4),
+          arr.slice(4, 8),
+          arr.slice(8, 12),
+          [null, null, null, null]
+        ];
+
+        const isAlreadySolved = result.slice(0, 3).every(row => row.every(t => t === row[0]));
+        if (isAlreadySolved) continue;
+
+        const minMoves = getMinMovesToSolve(result);
+        if (minMoves === -1) continue;
+
+        if (!fallbackResult) fallbackResult = result;
+
+        const pairs = countAdjacentPairs(result);
+        if (minMoves >= 7 && minMoves <= 10 && pairs >= 2) {
+          return result;
+        }
+      }
+
+      return fallbackResult || INITIAL_STATE_TYPES.map(row => [...row]);
+    }
+
+    function clearMagicEffects() {
+      if (magicPollenTimer) {
+        clearInterval(magicPollenTimer);
+        magicPollenTimer = null;
+      }
+      if (pollenLayer) {
+        pollenLayer.innerHTML = '';
+      }
+      stopMagicSound();
+    }
+
+    function spawnMagicPollenWave() {
+      if (!pollenLayer) return;
+      const glowingSlots = boardEl.querySelectorAll('.slot.magic-glow');
+      const colors = ['#fff9d6', '#ffe066', '#ffd166', '#ff9ebb', '#a8e6ff', '#ffffff'];
+
+      glowingSlots.forEach(slot => {
+        if (Math.random() > 0.65) return;
+        const rect = slot.getBoundingClientRect();
+        const count = 1 + Math.floor(Math.random() * 2);
+
+        for (let i = 0; i < count; i++) {
+          const dot = document.createElement('div');
+          dot.className = 'magic-pollen';
+
+          const size = 2.5 + Math.random() * 3.5;
+          const startX = rect.left + rect.width * (0.18 + Math.random() * 0.64);
+          const startY = rect.top + rect.height * (0.15 + Math.random() * 0.65);
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          const dur = (2.1 + Math.random() * 1.3).toFixed(2) + 's';
+          const rise = -(65 + Math.random() * 75).toFixed(0) + 'px';
+          const sway1 = ((Math.random() - 0.5) * 26).toFixed(0) + 'px';
+          const sway2 = ((Math.random() - 0.5) * 32).toFixed(0) + 'px';
+          const sway3 = ((Math.random() - 0.5) * 24).toFixed(0) + 'px';
+
+          dot.style.left = startX + 'px';
+          dot.style.top = startY + 'px';
+          dot.style.width = size + 'px';
+          dot.style.height = size + 'px';
+          dot.style.background = color;
+          dot.style.boxShadow = `0 0 ${Math.round(size * 2.5)}px ${color}, 0 0 ${Math.round(size * 4)}px rgba(255, 224, 102, 0.75)`;
+          dot.style.setProperty('--dur', dur);
+          dot.style.setProperty('--rise', rise);
+          dot.style.setProperty('--sway1', sway1);
+          dot.style.setProperty('--sway2', sway2);
+          dot.style.setProperty('--sway3', sway3);
+
+          pollenLayer.appendChild(dot);
+          setTimeout(() => {
+            if (dot.parentNode) dot.parentNode.removeChild(dot);
+          }, 3500);
+        }
+      });
+    }
+
+    function startMagicCelebration(currentSession) {
+      clearMagicEffects();
+
+      const shelfEls = boardEl.querySelectorAll('.shelf');
+      shelfEls.forEach((shelfEl, sIdx) => {
+        const hasBouquets = shelves[sIdx] && shelves[sIdx].some(item => item !== null);
+        if (hasBouquets) {
+          shelfEl.classList.add('magic-win');
+          const slots = shelfEl.querySelectorAll('.slot');
+          slots.forEach((slot, idx) => {
+            if (shelves[sIdx][idx] !== null) {
+              slot.classList.remove('blocked', 'selected');
+              slot.classList.add('magic-glow');
+              const waveDelay = (sIdx * 0.28 + idx * 0.16).toFixed(2);
+              slot.style.setProperty('--wave-delay', `${waveDelay}s`);
+            }
+          });
+        }
+      });
+
+      pauseBgMusic();
+      playMagicSparkleSound();
+      spawnMagicPollenWave();
+
+      magicPollenTimer = setInterval(() => {
+        if (currentSession !== gameSessionId || !isGameOver) {
+          clearMagicEffects();
+          return;
+        }
+        spawnMagicPollenWave();
+      }, 340);
+    }
+
+    function initGame() {
+      gameSessionId++;
+      clearMagicEffects();
+      stopAllSounds();
+      winScreen.classList.remove('active');
+      isGameOver = false;
+      isAnimating = false;
+      selectedShelf = -1;
+      selectedSlot = -1;
+      statusEl.textContent = 'Собери 4 одинаковых букета на одной полке!';
+      statusEl.style.color = '#4a9eff';
+      bgMusic.volume = BG_MUSIC_BASE_VOLUME;
+
+      const startTypes = generateShuffledTypes();
+      shelves = startTypes.map(shelfTypes =>
+        shelfTypes.map(type => {
+          if (!type) return null;
+          return {
+            type: type,
+            color: WRAPPER_COLORS[Math.floor(Math.random() * WRAPPER_COLORS.length)]
+          };
+        })
+      );
+
+      renderBoard();
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = '';
+
+      shelves.forEach((shelf, shelfIndex) => {
+        const shelfEl = document.createElement('div');
+        shelfEl.className = 'shelf';
+
+        for (let i = 0; i < 4; i++) {
+          const slotEl = document.createElement('div');
+          slotEl.className = 'slot';
+
+          const item = shelf[i];
+          if (item) {
+            slotEl.innerHTML = createBouquetSVG(item);
+
+            const itemsCount = shelf.filter(c => c !== null).length;
+            const isRightmost = (i === itemsCount - 1);
+
+            if (isGameOver) {
+              // После победы все букеты яркие, без затемнения
+            } else if (selectedShelf === shelfIndex && selectedSlot === i) {
+              slotEl.classList.add('selected');
+              slotEl.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                handleSlotClick(shelfIndex, i);
+              });
+            } else {
+              if (!isRightmost) {
+                slotEl.classList.add('blocked');
+              } else {
+                slotEl.addEventListener('pointerdown', (e) => {
+                  e.preventDefault();
+                  handleSlotClick(shelfIndex, i);
+                });
+              }
+            }
+          } else {
+            slotEl.addEventListener('pointerdown', (e) => {
+              e.preventDefault();
+              handleSlotClick(shelfIndex, i);
+            });
+          }
+
+          shelfEl.appendChild(slotEl);
+        }
+
+        boardEl.appendChild(shelfEl);
+      });
+    }
+
+    function handleSlotClick(shelfIndex, slotIndex) {
+      unlockAudioEngine();
+      if (isAnimating || isGameOver) return;
+
+      if (selectedShelf === -1) {
+        const item = shelves[shelfIndex][slotIndex];
+        if (!item) return;
+
+        const itemsCount = shelves[shelfIndex].filter(c => c !== null).length;
+        if (slotIndex !== itemsCount - 1) {
+          shakeElement(boardEl.children[shelfIndex].children[slotIndex]);
+          playSoundHybrid('error', 0.35);
+          return;
+        }
+
+        selectedShelf = shelfIndex;
+        selectedSlot = slotIndex;
+        playSoundHybrid('click', 0.45);
+        triggerHaptic(15);
+        renderBoard();
+        return;
+      }
+
+      if (selectedShelf === shelfIndex && selectedSlot === slotIndex) {
+        selectedShelf = -1;
+        selectedSlot = -1;
+        playSoundHybrid('click', 0.35);
+        renderBoard();
+        return;
+      }
+
+      const itemToMove = shelves[selectedShelf][selectedSlot];
+      const targetShelf = shelves[shelfIndex];
+      const targetItemsCount = targetShelf.filter(c => c !== null).length;
+      const targetTopItem = targetItemsCount > 0 ? targetShelf[targetItemsCount - 1] : null;
+
+      if (targetItemsCount < 4 && (targetItemsCount === 0 || targetTopItem.type === itemToMove.type)) {
+        isAnimating = true;
+        const currentSession = gameSessionId;
+
+        shelves[selectedShelf].splice(selectedSlot, 1);
+        padShelf(shelves[selectedShelf]);
+
+        targetShelf.push(itemToMove);
+        const newTargetShelf = targetShelf.filter(c => c !== null);
+        padShelf(newTargetShelf);
+        shelves[shelfIndex] = newTargetShelf;
+
+        playSoundHybrid('click', 0.6);
+        triggerHaptic(20);
+
+        selectedShelf = -1;
+        selectedSlot = -1;
+
+        setTimeout(() => {
+          if (currentSession !== gameSessionId) return;
+          renderBoard();
+          isAnimating = false;
+          checkWin();
+        }, 150);
+      } else {
+        shakeElement(boardEl.children[shelfIndex]);
+        playSoundHybrid('error', 0.45);
+        triggerHaptic([50, 50, 50]);
+      }
+    }
+
+    function shakeElement(el) {
+      if (!el) return;
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+      setTimeout(() => el.classList.remove('shake'), 400);
+    }
+
+    function checkWin() {
+      let isWin = true;
+
+      shelves.forEach(shelf => {
+        const items = shelf.filter(c => c !== null);
+        if (items.length > 0) {
+          if (items.length !== 4) {
+            isWin = false;
+          } else {
+            const firstType = items[0].type;
+            if (!items.every(c => c.type === firstType)) {
+              isWin = false;
+            }
+          }
+        }
+      });
+
+      if (isWin) {
+        isGameOver = true;
+        const currentSession = gameSessionId;
+        statusEl.textContent = 'Ты собрала идеальные букеты!';
+        statusEl.style.color = '#ffe066';
+
+        startMagicCelebration(currentSession);
+        triggerHaptic([60, 40, 80]);
+
+        setTimeout(() => {
+          if (currentSession !== gameSessionId) return;
+          clearMagicEffects();
+          playSoundHybrid('win', 0.8);
+          winScreen.classList.add('active');
+          launchFireworks();
+          triggerHaptic([100, 50, 100, 50, 200]);
+        }, 5000);
+      }
+    }
+
+    // =========================================================
+    // ПУЛ ЧАСТИЦ САЛЮТА
+    // =========================================================
+    const FIREWORK_POOL_SIZE = 90;
+    const fireworkPool = [];
+    const fireworksContainer = document.getElementById('fireworks');
+
+    for (let i = 0; i < FIREWORK_POOL_SIZE; i++) {
+      const p = document.createElement('div');
+      p.className = 'firework-particle';
+      fireworksContainer.appendChild(p);
+      fireworkPool.push(p);
+    }
+
+    function launchFireworks() {
+      const colors = ['#f5c518', '#ff4a6a', '#4a9eff', '#ff9800', '#aaffb0', '#ff99cc', '#ffffff'];
+      let poolIdx = 0;
+      const currentSession = gameSessionId;
+
+      for (let b = 0; b < 12; b++) {
+        setTimeout(() => {
+          if (currentSession !== gameSessionId || !isGameOver) return;
+          const burstX = 12 + Math.random() * 76;
+          const burstY = 12 + Math.random() * 76;
+          const particleCount = 12;
+
+          for (let i = 0; i < particleCount; i++) {
+            const particle = fireworkPool[poolIdx % FIREWORK_POOL_SIZE];
+            poolIdx++;
+
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5;
+            const distance = 50 + Math.random() * 110;
+            const size = 4 + Math.random() * 5;
+
+            particle.classList.remove('burst');
+            particle.style.left = burstX + '%';
+            particle.style.top = burstY + '%';
+            particle.style.background = color;
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            particle.style.setProperty('--dx', Math.cos(angle) * distance + 'px');
+            particle.style.setProperty('--dy', Math.sin(angle) * distance + 'px');
+
+            void particle.offsetWidth;
+            particle.classList.add('burst');
+          }
+        }, b * 220);
+      }
+    }
+
+    // =========================================================
+    // КНОПКИ УПРАВЛЕНИЯ
+    // =========================================================
+    muteBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      unlockAudioEngine();
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      bgMusic.muted = isMuted;
+      if (isMuted) {
+        stopMagicSound();
+        pauseBgMusic();
+      } else if (!isGameOver) {
+        startBgMusic();
+      }
+      Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
+    });
+
+    document.getElementById('start-btn').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      unlockAudioEngine();
+      triggerHaptic(20);
+      startScreen.style.display = 'none';
+      initGame();
+      startBgMusic();
+    });
+
+    document.getElementById('restart-btn').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      unlockAudioEngine();
+      triggerHaptic(20);
+      initGame();
+      startBgMusic();
+    });
+
+    document.getElementById('play-again-btn').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      unlockAudioEngine();
+      triggerHaptic(20);
+      initGame();
+      startBgMusic();
+    });
+
+    document.getElementById('next-btn').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      clearMagicEffects();
+      stopAllSounds();
+      pauseBgMusic();
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        pauseBgMusic();
+      } else if (!isMuted && !isGameOver && bgMusicStarted) {
+        startBgMusic();
+      }
+    });
+
+    initGame();
+  </script>
+</body>
+</html>

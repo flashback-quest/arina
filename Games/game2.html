@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Игра 2 (Повтори шаги)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: #0a0f1e;
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 20px;
+  }
+  
+  h2 { margin-bottom: 5px; font-size: 24px; color: #f5c518; text-align: center; }
+  #status { margin-bottom: 20px; font-size: 16px; font-weight: 700; color: #4a9eff; height: 40px; text-align: center; line-height: 1.2; }
+  #status.error { color: #ff4a6a; }
+  #status.win { color: #aaffb0; }
+
+  .mute-btn {
+    position: fixed; top: 20px; right: 20px; z-index: 200;
+    background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff; font-size: 24px; width: 46px; height: 46px; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .mute-btn:active { transform: scale(0.92) translateZ(0); }
+
+  #game-board {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    width: min(85vw, 320px);
+    aspect-ratio: 1;
+    margin-bottom: 30px;
+    touch-action: none;
+  }
+
+  .pad {
+    background: #1c2745;
+    border: 3px solid rgba(245, 197, 24, 0.2);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(40px, 15vw, 60px);
+    cursor: pointer;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: transform 0.09s ease-out, box-shadow 0.09s ease-out;
+    position: relative;
+  }
+  
+  .pad:active { transform: scale(0.95) translateZ(0); }
+
+  .pad[data-color="0"] { color: #ff4a6a; border-color: rgba(255, 74, 106, 0.35); }
+  .pad[data-color="1"] { color: #4a9eff; border-color: rgba(74, 158, 255, 0.35); }
+  .pad[data-color="2"] { color: #f5c518; border-color: rgba(245, 197, 24, 0.35); }
+  .pad[data-color="3"] { color: #aaffb0; border-color: rgba(170, 255, 176, 0.35); }
+
+  .pad.active[data-color="0"] {
+    background: #ff4a6a;
+    border-color: #ff9eb0;
+    color: #fff;
+    transform: scale(1.05) translateZ(0);
+    box-shadow: 0 0 22px rgba(255, 74, 106, 0.75), 0 0 8px rgba(255, 158, 176, 0.5);
+  }
+  .pad.active[data-color="1"] {
+    background: #4a9eff;
+    border-color: #a3ceff;
+    color: #fff;
+    transform: scale(1.05) translateZ(0);
+    box-shadow: 0 0 22px rgba(74, 158, 255, 0.75), 0 0 8px rgba(163, 206, 255, 0.5);
+  }
+  .pad.active[data-color="2"] {
+    background: #f5c518;
+    border-color: #ffe680;
+    color: #10172b;
+    transform: scale(1.05) translateZ(0);
+    box-shadow: 0 0 22px rgba(245, 197, 24, 0.75), 0 0 8px rgba(255, 230, 128, 0.5);
+  }
+  .pad.active[data-color="3"] {
+    background: #aaffb0;
+    border-color: #e0ffe2;
+    color: #10172b;
+    transform: scale(1.05) translateZ(0);
+    box-shadow: 0 0 22px rgba(170, 255, 176, 0.75), 0 0 8px rgba(224, 255, 226, 0.5);
+  }
+
+  #win-screen {
+    position: absolute; inset: 0;
+    background: rgba(10, 15, 30, 0.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  #win-screen.active { display: flex; }
+  #win-screen h3 { color: #f5c518; font-size: 32px; margin-bottom: 10px; text-align: center; }
+  #win-screen p { font-size: 18px; margin-bottom: 24px; text-align: center; }
+
+  .win-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #f5c518, #ff9800);
+    color: #10172b; border: none; padding: 16px 36px; font-size: 16px;
+    font-weight: 900; font-family: inherit; border-radius: 50px; cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out, background 0.15s ease-out;
+    z-index: 10;
+    min-width: 210px;
+  }
+  .btn:active { transform: scale(0.95) translateZ(0); }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 13px 28px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .btn-secondary:active {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  #start-screen {
+    position: absolute; inset: 0;
+    background: rgba(10, 15, 30, 0.94);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 90;
+  }
+</style>
+</head>
+<body>
+  <button id="mute-btn" class="mute-btn" title="Включить/выключить звук">🔊</button>
+
+  <h2>Повтори шаги</h2>
+  <div id="status">Нажми "Старт", чтобы начать</div>
+
+  <div id="game-board">
+    <div class="pad" data-color="0" data-index="0">👣</div>
+    <div class="pad" data-color="1" data-index="1">🦶</div>
+    <div class="pad" data-color="2" data-index="2">🦶</div>
+    <div class="pad" data-color="3" data-index="3">👣</div>
+  </div>
+
+  <button class="btn btn-secondary" id="restart-btn">Начать заново</button>
+
+  <div id="start-screen">
+    <button class="btn" id="start-btn">Старт</button>
+  </div>
+
+  <div id="win-screen">
+    <h3>Победа! 🎉</h3>
+    <p>Ты отлично повторяешь шаги!</p>
+    <div class="win-controls">
+      <button class="btn" id="next-btn">Дальше</button>
+      <button class="btn btn-secondary" id="play-again-btn">Ещё разик</button>
+    </div>
+  </div>
+
+  <script>
+    const pads = Array.from(document.querySelectorAll('.pad'));
+    const statusEl = document.getElementById('status');
+    const winScreen = document.getElementById('win-screen');
+    const startScreen = document.getElementById('start-screen');
+    const muteBtn = document.getElementById('mute-btn');
+
+    let sequence = [];
+    let playerSequence = [];
+    const LEVEL_STEPS = [3, 4, 5];
+    let currentLevelIndex = 0;
+
+    let isPlayingSequence = false;
+    let isPlayerTurn = false;
+    let isGameOver = false;
+    let isMuted = false;
+
+    let gameSessionId = 0;
+    let activeTimers = [];
+    let activeIntervals = [];
+
+    function triggerHaptic(ms = 20) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(ms); } catch (e) {}
+      }
+    }
+
+    // =========================================================
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА (БЕЗ СКЛЕЙКИ ЗВУКОВ НА iPHONE)
+    // =========================================================
+    const soundFiles = {
+      0: '../sounds/step1.mp3',
+      1: '../sounds/step2.mp3',
+      2: '../sounds/step3.mp3',
+      3: '../sounds/step4.mp3',
+      win: '../sounds/win3.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const soundBuffers = { 0: null, 1: null, 2: null, 3: null, win: null };
+    const htmlAudioPool = {};
+    const isLocalFile = window.location.protocol === 'file:';
+    let isAudioUnlocked = false;
+
+    Object.keys(soundFiles).forEach(key => {
+      const a = new Audio(soundFiles[key]);
+      a.preload = 'auto';
+      htmlAudioPool[key] = a;
+    });
+
+    async function loadSoundBuffer(key, url) {
+      if (!audioCtx || isLocalFile) return;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const arrayBuffer = await response.arrayBuffer();
+        soundBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        soundBuffers[key] = null;
+      }
+    }
+
+    Object.keys(soundFiles).forEach(key => loadSoundBuffer(key, soundFiles[key]));
+
+    function unlockAudioEngine() {
+      if (isAudioUnlocked) return;
+      isAudioUnlocked = true;
+
+      if (audioCtx) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        try {
+          const buffer = audioCtx.createBuffer(1, 1, 22050);
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          source.start(0);
+        } catch (e) {}
+      }
+    }
+
+    function playHtmlAudioFallback(key, volume) {
+      const audio = htmlAudioPool[key];
+      if (!audio) return;
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = volume;
+        audio.muted = isMuted;
+        audio.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    function playSoundHybrid(key, volume = 0.6) {
+      if (isMuted) return;
+
+      const buffer = soundBuffers[key];
+      if (audioCtx && buffer && !isLocalFile) {
+        const startBuffer = () => {
+          try {
+            const source = audioCtx.createBufferSource();
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.value = volume;
+            source.buffer = buffer;
+            source.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            source.start(audioCtx.currentTime + 0.01);
+          } catch (e) {
+            playHtmlAudioFallback(key, volume);
+          }
+        };
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(startBuffer).catch(() => playHtmlAudioFallback(key, volume));
+        } else {
+          startBuffer();
+        }
+      } else {
+        playHtmlAudioFallback(key, volume);
+      }
+    }
+
+    // =========================================================
+    // БЕЗОПАСНЫЕ ТАЙМЕРЫ И ЛОГИКА ИГРЫ
+    // =========================================================
+    function safeTimeout(fn, delay) {
+      const currentSession = gameSessionId;
+      const id = setTimeout(() => {
+        if (currentSession === gameSessionId) fn();
+      }, delay);
+      activeTimers.push(id);
+      return id;
+    }
+
+    function safeInterval(fn, delay) {
+      const currentSession = gameSessionId;
+      const id = setInterval(() => {
+        if (currentSession === gameSessionId) fn();
+        else clearInterval(id);
+      }, delay);
+      activeIntervals.push(id);
+      return id;
+    }
+
+    function clearAllTimers() {
+      for (let i = 0; i < activeTimers.length; i++) clearTimeout(activeTimers[i]);
+      activeTimers.length = 0;
+      for (let i = 0; i < activeIntervals.length; i++) clearInterval(activeIntervals[i]);
+      activeIntervals.length = 0;
+    }
+
+    muteBtn.addEventListener('click', () => {
+      unlockAudioEngine();
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
+    });
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      unlockAudioEngine();
+      initGame(true);
+    });
+    document.getElementById('play-again-btn').addEventListener('click', () => {
+      unlockAudioEngine();
+      initGame(true);
+    });
+    document.getElementById('next-btn').addEventListener('click', () => {
+      unlockAudioEngine();
+      triggerHaptic(20);
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: "QUEST_WIN" }, "*");
+      }
+    });
+
+    function startGame() {
+      unlockAudioEngine();
+      triggerHaptic(20);
+      startScreen.style.display = 'none';
+      safeTimeout(() => initGame(false), 40);
+    }
+
+    function initGame(withHaptic = false) {
+      if (withHaptic) triggerHaptic(20);
+      gameSessionId++;
+      clearAllTimers();
+
+      winScreen.classList.remove('active');
+      isPlayingSequence = false;
+      isPlayerTurn = false;
+      isGameOver = false;
+      currentLevelIndex = 0;
+
+      for (let i = 0; i < pads.length; i++) {
+        pads[i].classList.remove('active');
+      }
+      playSequence();
+    }
+
+    function playSequence() {
+      isPlayerTurn = false;
+      isPlayingSequence = true;
+      playerSequence = [];
+      
+      const totalLevels = LEVEL_STEPS.length;
+      const stepsCount = LEVEL_STEPS[currentLevelIndex];
+      
+      statusEl.textContent = `Уровень ${currentLevelIndex + 1} из ${totalLevels}. Смотри...`;
+      statusEl.className = '';
+
+      sequence = [];
+      for (let i = 0; i < stepsCount; i++) {
+        sequence.push(Math.floor(Math.random() * 4));
+      }
+
+      let i = 0;
+      
+      function nextFlash() {
+        if (i >= sequence.length) {
+          safeTimeout(() => {
+            isPlayingSequence = false;
+            isPlayerTurn = true;
+            statusEl.textContent = `Уровень ${currentLevelIndex + 1}. Твой ход!`;
+          }, 400);
+          return;
+        }
+
+        const stepIdx = sequence[i];
+        const pad = pads[stepIdx];
+        pad.classList.add('active');
+        playSoundHybrid(stepIdx, 0.6);
+        
+        safeTimeout(() => {
+          pad.classList.remove('active');
+          i++;
+          safeTimeout(nextFlash, 150);
+        }, 400);
+      }
+      
+      safeTimeout(nextFlash, 460);
+    }
+
+    for (let i = 0; i < pads.length; i++) {
+      const pad = pads[i];
+      const index = i;
+
+      pad.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        unlockAudioEngine();
+        if (!isPlayerTurn || isPlayingSequence || isGameOver) return;
+        
+        pad.classList.add('active');
+        playSoundHybrid(index, 0.6);
+        triggerHaptic(20);
+        
+        safeTimeout(() => pad.classList.remove('active'), 200);
+
+        playerSequence.push(index);
+
+        const currentStep = playerSequence.length - 1;
+        if (playerSequence[currentStep] !== sequence[currentStep]) {
+          isPlayerTurn = false;
+          statusEl.textContent = 'Ой, ошибка! Начинаем заново...';
+          statusEl.className = 'error';
+          triggerHaptic([100, 50, 100, 50, 200]);
+          
+          safeTimeout(() => {
+            initGame(false);
+          }, 1500);
+          return;
+        }
+
+        if (playerSequence.length === sequence.length) {
+          isPlayerTurn = false;
+          
+          if (currentLevelIndex >= LEVEL_STEPS.length - 1) {
+            triggerVictory();
+          } else {
+            currentLevelIndex++;
+            statusEl.textContent = 'Молодец! Следующий уровень...';
+            safeTimeout(playSequence, 1500);
+          }
+        }
+      });
+    }
+
+    function triggerVictory() {
+      isGameOver = true;
+      statusEl.textContent = 'Победа! 🎉';
+      statusEl.className = 'win';
+      
+      const flashInterval = safeInterval(() => {
+        for (let i = 0; i < pads.length; i++) {
+          if (Math.random() > 0.5) pads[i].classList.add('active');
+          else pads[i].classList.remove('active');
+        }
+      }, 100);
+
+      playSoundHybrid('win', 0.8);
+
+      safeTimeout(() => {
+        clearInterval(flashInterval);
+        for (let i = 0; i < pads.length; i++) pads[i].classList.remove('active');
+        winScreen.classList.add('active');
+        triggerHaptic([100, 50, 100, 50, 200]);
+      }, 2800);
+    }
+  </script>
+</body>
+</html>

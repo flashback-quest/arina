@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Тёмная комната</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body {
+    touch-action: manipulation;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: #05070f;
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 15px;
+  }
+  
+  h2 { margin-bottom: 5px; font-size: 20px; color: #f5c518; text-align: center; }
+  #hearts {
+    font-size: 20px; margin-bottom: 10px; letter-spacing: 2px;
+  }
+
+  #status { margin-bottom: 10px; font-size: 14px; font-weight: 700; color: #888; text-align: center; height: 20px; }
+
+  .mute-btn {
+    position: fixed; top: 20px; right: 20px; z-index: 200;
+    background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff; font-size: 24px; width: 46px; height: 46px; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .mute-btn:active { transform: scale(0.92) translateZ(0); }
+
+  #board-container {
+    position: relative;
+    width: min(95vw, 380px);
+    aspect-ratio: 1;
+    padding: 6px;
+    background: #1c2745;
+    border-radius: 12px;
+    overflow: hidden;
+    touch-action: none;
+    transition: box-shadow 0.6s ease;
+  }
+
+  #board-container.victory-glow {
+    box-shadow: 0 0 28px rgba(245, 197, 24, 0.65), 0 0 12px rgba(170, 255, 176, 0.45);
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    gap: 4px;
+    width: 100%; height: 100%;
+    position: relative;
+  }
+
+  .cell {
+    background: #0a0f1e;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(16px, 4vw, 22px);
+    cursor: pointer;
+    position: relative;
+    border: 1px solid transparent;
+    transform: translateZ(0);
+    overflow: hidden;
+  }
+
+  .cell.player {
+    background: rgba(245, 197, 24, 0.22);
+    border: 2px solid #f5c518;
+  }
+
+  .hero-img {
+    width: 86%;
+    height: 86%;
+    object-fit: contain;
+    pointer-events: none;
+    transition: transform 0.14s ease-out;
+  }
+
+  .hero-img.face-left {
+    transform: scaleX(-1);
+  }
+
+  .cell.exit {
+    background: transparent; 
+  }
+
+  .cell.exit.revealed {
+    background: rgba(170, 255, 176, 0.25);
+    border: 1px solid rgba(170, 255, 176, 0.9);
+  }
+
+  .cell.ghost-revealed {
+    background: rgba(255, 74, 106, 0.16);
+    border: 1px solid rgba(255, 74, 106, 0.45);
+  }
+
+  /* Встреченные привидения: сама клетка остаётся тёмно-синей (#0a0f1e) под фонарём, а над тьмой парит только тень страха */
+  .cell.ghost-seen {
+    transform: none;
+    overflow: visible;
+  }
+
+  .cell.ghost-seen .cell-ghost {
+    position: relative;
+    z-index: 11;
+    opacity: 0.08;
+  }
+
+  .cell-ghost {
+    width: 82%;
+    height: 82%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: cell-ghost-hover 1.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .cell-ghost img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  @keyframes cell-ghost-hover {
+    0%, 100% { transform: translateY(-2px) scale(0.96); }
+    50% { transform: translateY(2px) scale(1.06); }
+  }
+
+  /* Призрачная подсказка безопасной клетки */
+  .cell.ghost-hint {
+    animation: ghost-hint-pulse 1.6s ease-in-out infinite;
+    z-index: 15;
+  }
+  @keyframes ghost-hint-pulse {
+    0%, 100% {
+      background: #0a0f1e;
+      border-color: rgba(170, 255, 176, 0.25);
+    }
+    50% {
+      background: rgba(170, 255, 176, 0.28);
+      border-color: rgba(170, 255, 176, 0.95);
+    }
+  }
+
+  #darkness {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    background: #000;
+    transition: opacity 0.7s ease-out;
+  }
+
+  #darkness::after {
+    content: '🚪';
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    width: calc((100% - 12px - 24px) / 7);
+    height: calc((100% - 12px - 24px) / 7);
+    border-radius: 4px;
+    background: rgba(170, 255, 176, 0.18);
+    border: 1px solid rgba(170, 255, 176, 0.8);
+    pointer-events: none;
+    animation: pulse-exit 2s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(16px, 4vw, 22px);
+    color: #fff;
+    z-index: 12;
+  }
+
+  #darkness.victory {
+    opacity: 0;
+  }
+
+  #darkness.victory::after {
+    display: none;
+  }
+
+  @keyframes pulse-exit {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .ghost-jumpscare {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 150px;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: jumpscare 1.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+  }
+
+  .ghost-jumpscare img {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+  }
+
+  @keyframes jumpscare {
+    0% { transform: scale(0) rotate(0deg) translateZ(0); opacity: 0; }
+    10% { transform: scale(3) rotate(-15deg) translateZ(0); opacity: 1; }
+    30% { transform: scale(3) rotate(15deg) translateZ(0); }
+    50% { transform: scale(3) rotate(-15deg) translateZ(0); }
+    70% { transform: scale(3) rotate(15deg) translateZ(0); opacity: 1; }
+    90% { transform: scale(1.5) translateZ(0); opacity: 1; }
+    100% { transform: scale(0) translateZ(0); opacity: 0; }
+  }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10, 15, 30, 0.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 200; text-align: center; padding: 24px;
+  }
+  .overlay.active { display: flex; }
+  .overlay h3 { font-size: 28px; margin-bottom: 15px; z-index: 10; }
+  .overlay p { font-size: 18px; margin-bottom: 25px; line-height: 1.5; max-width: 320px; color: #fff; z-index: 10; }
+
+  .win-ghost {
+    font-size: 64px;
+    width: 84px;
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    z-index: 10;
+    will-change: transform, filter;
+    filter: drop-shadow(0 0 18px rgba(255, 240, 170, 0.85)) drop-shadow(0 0 36px rgba(245, 197, 24, 0.55));
+    animation: ghost-float 2.6s ease-in-out infinite;
+  }
+  .win-ghost img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  @keyframes ghost-float {
+    0%, 100% {
+      transform: translateY(0) rotate(-4deg) translateZ(0);
+      filter: drop-shadow(0 0 16px rgba(255, 240, 170, 0.8)) drop-shadow(0 0 32px rgba(245, 197, 24, 0.5));
+    }
+    50% {
+      transform: translateY(-10px) rotate(4deg) translateZ(0);
+      filter: drop-shadow(0 0 26px rgba(255, 250, 210, 1)) drop-shadow(0 0 48px rgba(245, 197, 24, 0.85));
+    }
+  }
+
+  #win-screen h3 {
+    color: #f5c518;
+    font-size: 32px;
+    font-weight: 900;
+    margin-bottom: 24px;
+    z-index: 10;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #ffe066 0%, #f5c518 50%, #ff9800 100%);
+    color: #10172b;
+    border: 2px solid #fff5b8;
+    padding: 13px 40px;
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 900;
+    border-radius: 50px;
+    cursor: pointer;
+    z-index: 10;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .btn:active { transform: scale(0.95) translateZ(0); }
+  .btn-red {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #ff4a6a, #ff7676);
+    color: #fff;
+    border: 2px solid #f5c518;
+    box-shadow: 0 0 16px rgba(245, 197, 24, 0.65), 0 0 32px rgba(245, 197, 24, 0.35), inset 0 0 10px rgba(255, 245, 184, 0.35);
+    animation: retry-btn-pulse 2s ease-in-out infinite;
+  }
+  .btn-red::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -75%;
+    width: 50%;
+    height: 200%;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 250, 210, 0.55) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: rotate(25deg) translateZ(0);
+    pointer-events: none;
+    animation: retry-btn-sheen 3.2s ease-in-out infinite;
+  }
+  .btn-red:active {
+    animation: none;
+    transform: scale(0.95) translateZ(0);
+  }
+  @keyframes retry-btn-pulse {
+    0%, 100% {
+      transform: scale(1) translateZ(0);
+      box-shadow: 0 0 14px rgba(245, 197, 24, 0.6), 0 0 28px rgba(245, 197, 24, 0.3), inset 0 0 8px rgba(255, 245, 184, 0.3);
+    }
+    50% {
+      transform: scale(1.05) translateZ(0);
+      box-shadow: 0 0 24px rgba(245, 197, 24, 0.95), 0 0 44px rgba(255, 224, 102, 0.6), inset 0 0 14px rgba(255, 250, 210, 0.65);
+    }
+  }
+  @keyframes retry-btn-sheen {
+    0%, 55% { left: -75%; }
+    100% { left: 135%; }
+  }
+
+  .back-hint {
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #b8d4ff;
+    max-width: 260px;
+    z-index: 10;
+    opacity: 0.9;
+  }
+
+  #start-screen {
+    position: absolute; inset: 0;
+    background: rgba(10, 15, 30, 0.96);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 300;
+  }
+
+  #fireflies-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+  <button id="mute-btn" class="mute-btn" title="Включить/выключить звук">🔊</button>
+
+  <h2>Тёмная комната</h2>
+  <div id="hearts">❤️❤️❤️❤️❤️</div>
+  <div id="status">Найди безопасный путь к двери!</div>
+
+  <div id="board-container">
+    <div id="board"></div>
+    <div id="darkness"></div>
+  </div>
+
+  <!-- Экран победы -->
+  <div id="win-screen" class="overlay">
+    <canvas id="fireflies-canvas"></canvas>
+    <div class="win-ghost" id="win-ghost-box">👻</div>
+    <h3>Ты выбралась!</h3>
+    <button class="btn" id="next-btn">Дальше</button>
+    <div class="back-hint">Можно вернуться в эту игру со следующего экрана по кнопке «Назад».</div>
+  </div>
+
+  <!-- Экран поражения -->
+  <div id="lose-screen" class="overlay">
+    <h3 style="color: #ff4a6a;">Ты заплутала в темноте... 👻</h3>
+    <p>Надо преодолеть все страхи.
+    Ничего не бойся! Смелее!</p>
+    <button class="btn btn-red" id="retry-btn" style="z-index: 10;">Заходи снова</button>
+  </div>
+
+  <!-- Стартовый экран -->
+  <div id="start-screen">
+    <h3 style="color: #f5c518; margin-bottom: 20px; font-size: 24px;">Готовься преодолевать страх!</h3>
+    <button class="btn" id="start-btn">Войти в комнату</button>
+  </div>
+
+  <script>
+    // Защита от случайного масштабирования (зума) в Safari на iPhone при быстрых нажатиях
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
+    let lastTouchEndTime = 0;
+    document.addEventListener('touchend', function (e) {
+      const now = Date.now();
+      if (now - lastTouchEndTime <= 350) {
+        e.preventDefault();
+      }
+      lastTouchEndTime = now;
+    }, { passive: false });
+
+    const SIZE = 7;
+    const GHOSTS_COUNT = 14;        // Ровно 14 страхов в каждом раунде
+    const HINT_DELAY_MS = 10000;    // Призрачная подсказка через 10 секунд бездействия
+
+    const GIRL_IMG_SRC = '../pictures/girl.png';
+    const GHOST_IMG_SRC = '../pictures/ghost.png';
+    let hasCustomGhostImg = false;
+
+    const boardData = new Array(SIZE * SIZE).fill(0);
+    const cellElements = [];
+    const discoveredGhosts = new Set();
+    let safePathOrder = [];
+    
+    let playerRow = 0;
+    let playerCol = 0;
+    let facingLeft = false;
+    let isGameOver = false;
+    let isAnimating = false;
+    let lives = 5;
+    let isMuted = false;
+    let sessionToken = 0;
+    let hintTimeoutId = null;
+    let hintedCellEl = null;
+
+    const boardContainer = document.getElementById('board-container');
+    const boardEl = document.getElementById('board');
+    const darknessEl = document.getElementById('darkness');
+    const winScreen = document.getElementById('win-screen');
+    const loseScreen = document.getElementById('lose-screen');
+    const statusEl = document.getElementById('status');
+    const heartsEl = document.getElementById('hearts');
+    const startScreen = document.getElementById('start-screen');
+    const muteBtn = document.getElementById('mute-btn');
+    const winGhostBox = document.getElementById('win-ghost-box');
+
+    // Проверка наличия файла ../pictures/ghost.png (если его нет — остаётся эмодзи 👻)
+    const ghostProbeImg = new Image();
+    ghostProbeImg.onload = () => {
+      hasCustomGhostImg = true;
+      winGhostBox.innerHTML = `<img src="${GHOST_IMG_SRC}" alt="Страх">`;
+    };
+    ghostProbeImg.onerror = () => {
+      hasCustomGhostImg = false;
+      winGhostBox.textContent = '👻';
+    };
+    ghostProbeImg.src = GHOST_IMG_SRC;
+
+    function createGhostVisualHTML() {
+      if (hasCustomGhostImg) {
+        return `<img src="${GHOST_IMG_SRC}" alt="Страх">`;
+      }
+      return '👻';
+    }
+
+    function triggerHaptic(pattern) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+      }
+    }
+
+    // =========================================================
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА (iOS Safari + ПК file:///)
+    // =========================================================
+    const SOUND_FILES = {
+      click: '../sounds/click3.mp3',
+      ghost: '../sounds/krime.mp3',
+      win: '../sounds/win3.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const soundBuffers = { click: null, ghost: null, win: null };
+    const htmlAudioPool = {};
+    const isLocalFile = window.location.protocol === 'file:';
+    let isAudioUnlocked = false;
+
+    const bgMusic = new Audio('../sounds/fonstrah2.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.4;
+
+    Object.keys(SOUND_FILES).forEach(key => {
+      const a = new Audio(SOUND_FILES[key]);
+      a.preload = 'auto';
+      htmlAudioPool[key] = a;
+    });
+
+    async function loadSoundBuffer(key, url) {
+      if (!audioCtx || isLocalFile) return;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP');
+        const buf = await res.arrayBuffer();
+        soundBuffers[key] = await audioCtx.decodeAudioData(buf);
+      } catch (e) {
+        soundBuffers[key] = null;
+      }
+    }
+
+    Object.keys(SOUND_FILES).forEach(key => loadSoundBuffer(key, SOUND_FILES[key]));
+
+    function unlockAudio() {
+      if (isAudioUnlocked) return;
+      isAudioUnlocked = true;
+      if (audioCtx) {
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        try {
+          const b = audioCtx.createBuffer(1, 1, 22050);
+          const s = audioCtx.createBufferSource();
+          s.buffer = b;
+          s.connect(audioCtx.destination);
+          s.start(0);
+        } catch (e) {}
+      }
+    }
+
+    function playFallbackAudio(key, volume) {
+      const a = htmlAudioPool[key];
+      if (!a) return;
+      try {
+        a.pause();
+        a.currentTime = 0;
+        a.volume = volume;
+        a.muted = isMuted;
+        a.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    function playSoundHybrid(key, volume = 0.6) {
+      if (isMuted) return;
+      const buf = soundBuffers[key];
+      if (audioCtx && buf && !isLocalFile) {
+        const start = () => {
+          try {
+            const src = audioCtx.createBufferSource();
+            const gain = audioCtx.createGain();
+            gain.gain.value = volume;
+            src.buffer = buf;
+            src.connect(gain);
+            gain.connect(audioCtx.destination);
+            src.start(audioCtx.currentTime + 0.01);
+          } catch (e) {
+            playFallbackAudio(key, volume);
+          }
+        };
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(start).catch(() => playFallbackAudio(key, volume));
+        } else {
+          start();
+        }
+      } else {
+        playFallbackAudio(key, volume);
+      }
+    }
+
+    // =========================================================
+    // ПРИЗРАЧНАЯ ПОДСКАЗКА (ЧЕРЕЗ 10 СЕКУНД БЕЗДЕЙСТВИЯ)
+    // =========================================================
+    function clearGhostHint() {
+      if (hintTimeoutId) {
+        clearTimeout(hintTimeoutId);
+        hintTimeoutId = null;
+      }
+      if (hintedCellEl) {
+        hintedCellEl.classList.remove('ghost-hint');
+        hintedCellEl = null;
+      }
+    }
+
+    function findBestSafeNeighbor(r, c) {
+      const dirs = [
+        [0, 1], [1, 0], [0, -1], [-1, 0]
+      ];
+      let bestCell = null;
+      let bestScore = -999;
+
+      for (let i = 0; i < dirs.length; i++) {
+        const nr = r + dirs[i][0];
+        const nc = c + dirs[i][1];
+        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue;
+        const idx = nr * SIZE + nc;
+        if (boardData[idx] === 1) continue;
+
+        const pathPos = safePathOrder.indexOf(idx);
+        const distScore = (nr + nc) * 10 + (pathPos !== -1 ? 50 + pathPos : 0);
+        if (distScore > bestScore) {
+          bestScore = distScore;
+          bestCell = { r: nr, c: nc, idx };
+        }
+      }
+      return bestCell;
+    }
+
+    function scheduleGhostHint() {
+      clearGhostHint();
+      if (isGameOver || isAnimating) return;
+
+      const currentToken = sessionToken;
+      hintTimeoutId = setTimeout(() => {
+        if (currentToken !== sessionToken || isGameOver || isAnimating) return;
+        const target = findBestSafeNeighbor(playerRow, playerCol);
+        if (target && cellElements[target.idx]) {
+          hintedCellEl = cellElements[target.idx];
+          hintedCellEl.classList.add('ghost-hint');
+        }
+      }, HINT_DELAY_MS);
+    }
+
+    // =========================================================
+    // ИНИЦИАЛИЗАЦИЯ ПОЛЯ ОДИН РАЗ (БЕЗ ПЕРЕСОЗДАНИЯ DOM)
+    // =========================================================
+    function buildBoardOnce() {
+      boardEl.innerHTML = '';
+      cellElements.length = 0;
+      const frag = document.createDocumentFragment();
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            unlockAudio();
+            handleCellClick(r, c);
+          });
+          cellElements.push(cell);
+          frag.appendChild(cell);
+        }
+      }
+      boardEl.appendChild(frag);
+    }
+
+    muteBtn.addEventListener('click', () => {
+      unlockAudio();
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      bgMusic.muted = isMuted;
+      Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
+    });
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      stopFireflies();
+      clearGhostHint();
+      bgMusic.pause();
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+      }
+    });
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('retry-btn').addEventListener('click', () => {
+      unlockAudio();
+      playSoundHybrid('click', 0.65);
+      triggerHaptic(30);
+      initGame();
+    });
+
+    function startGame() {
+      unlockAudio();
+      startScreen.style.display = 'none';
+      if (!isMuted) {
+        bgMusic.play().catch(() => {});
+      }
+      initGame();
+    }
+
+    function initGame() {
+      sessionToken++;
+      stopFireflies();
+      clearGhostHint();
+      discoveredGhosts.clear();
+      document.querySelectorAll('.ghost-jumpscare').forEach(el => el.remove());
+
+      winScreen.classList.remove('active');
+      loseScreen.classList.remove('active');
+      darknessEl.classList.remove('victory');
+      boardContainer.classList.remove('victory-glow');
+      
+      if (bgMusic.paused && !isMuted) {
+        bgMusic.play().catch(() => {});
+      }
+
+      isGameOver = false;
+      isAnimating = false;
+      lives = 5;
+      updateHearts();
+      
+      generateMaze();
+      
+      playerRow = 0;
+      playerCol = 0;
+      facingLeft = false;
+      
+      updateBoardVisuals();
+      updateLight();
+      scheduleGhostHint();
+      
+      statusEl.textContent = 'Куда пойдем?';
+      statusEl.style.color = '#888';
+    }
+
+    function updateHearts() {
+      let heartsStr = '';
+      for (let i = 0; i < 5; i++) {
+        heartsStr += i < lives ? '❤️' : '🖤';
+      }
+      heartsEl.textContent = heartsStr;
+    }
+
+    // =========================================================
+    // ГЕНЕРАЦИЯ ЛАБИРИНТА (РОВНО 14 СТРАХОВ + ГАРАНТИРОВАННЫЙ ПУТЬ)
+    // =========================================================
+    function generateMaze() {
+      boardData.fill(0);
+      safePathOrder = [];
+
+      const safePath = new Set();
+      let r = 0, c = 0;
+      safePath.add(`${r},${c}`);
+      safePathOrder.push(r * SIZE + c);
+      
+      while (r < SIZE - 1 || c < SIZE - 1) {
+        if (r === SIZE - 1) c++;
+        else if (c === SIZE - 1) r++;
+        else {
+          if (Math.random() > 0.5) r++;
+          else c++;
+        }
+        safePath.add(`${r},${c}`);
+        safePathOrder.push(r * SIZE + c);
+      }
+      
+      boardData[SIZE * SIZE - 1] = 3; // Выход
+
+      const freeCells = [];
+      for (let i = 0; i < SIZE * SIZE; i++) {
+        const row = Math.floor(i / SIZE);
+        const col = i % SIZE;
+        if (!safePath.has(`${row},${col}`)) {
+          freeCells.push(i);
+        }
+      }
+
+      for (let i = freeCells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [freeCells[i], freeCells[j]] = [freeCells[j], freeCells[i]];
+      }
+
+      for (let i = 0; i < Math.min(GHOSTS_COUNT, freeCells.length); i++) {
+        boardData[freeCells[i]] = 1;
+      }
+    }
+
+    function updateLight() {
+      const x = ((playerCol + 0.5) / SIZE) * 100;
+      const y = ((playerRow + 0.5) / SIZE) * 100;
+      darknessEl.style.background = `radial-gradient(circle at ${x}% ${y}%, transparent 13%, rgba(0,0,0,0.85) 36%, #000 52%)`;
+    }
+
+    function updateBoardVisuals() {
+      const playerIdx = playerRow * SIZE + playerCol;
+      const dirClass = facingLeft ? 'hero-img face-left' : 'hero-img';
+      const ghostHTML = createGhostVisualHTML();
+
+      for (let i = 0; i < SIZE * SIZE; i++) {
+        const cell = cellElements[i];
+        if (i === playerIdx) {
+          cell.className = 'cell player';
+          cell.innerHTML = `<img src="${GIRL_IMG_SRC}" class="${dirClass}" alt="Героиня">`;
+        } else if (boardData[i] === 1 && discoveredGhosts.has(i)) {
+          cell.className = 'cell ghost-seen';
+          cell.innerHTML = `<div class="cell-ghost">${ghostHTML}</div>`;
+        } else if (boardData[i] === 3) {
+          cell.className = 'cell exit';
+          cell.innerHTML = '';
+        } else {
+          cell.className = 'cell';
+          cell.innerHTML = '';
+        }
+      }
+    }
+
+    function revealAllGhostsOnEnd(isVictory) {
+      const playerIdx = playerRow * SIZE + playerCol;
+      const dirClass = facingLeft ? 'hero-img face-left' : 'hero-img';
+      const ghostHTML = createGhostVisualHTML();
+
+      for (let i = 0; i < SIZE * SIZE; i++) {
+        const cell = cellElements[i];
+        if (i === playerIdx && isVictory) {
+          cell.className = 'cell player exit revealed';
+          cell.innerHTML = `<img src="${GIRL_IMG_SRC}" class="${dirClass}" alt="Героиня">`;
+        } else if (boardData[i] === 1) {
+          cell.className = 'cell ghost-revealed';
+          cell.innerHTML = `<div class="cell-ghost">${ghostHTML}</div>`;
+        } else if (boardData[i] === 3) {
+          cell.className = 'cell exit revealed';
+          cell.innerHTML = '🚪';
+        } else {
+          cell.className = 'cell';
+          cell.innerHTML = '';
+        }
+      }
+    }
+
+    function isNeighbor(r, c) {
+      const dr = Math.abs(r - playerRow);
+      const dc = Math.abs(c - playerCol);
+      return (dr === 1 && dc === 0) || (dr === 0 && dc === 1);
+    }
+
+    function handleCellClick(r, c) {
+      if (isGameOver || isAnimating) return;
+      if (!isNeighbor(r, c)) return;
+
+      clearGhostHint();
+
+      if (c < playerCol) facingLeft = true;
+      else if (c > playerCol) facingLeft = false;
+
+      const index = r * SIZE + c;
+      const type = boardData[index];
+      const currentToken = sessionToken;
+
+      if (type === 1) {
+        // ВСТРЕЧА СО СТРАХОМ
+        isAnimating = true;
+        lives--;
+        updateHearts();
+        discoveredGhosts.add(index);
+        
+        playSoundHybrid('ghost', 0.8);
+        
+        const ghostEl = document.createElement('div');
+        ghostEl.className = 'ghost-jumpscare';
+        ghostEl.innerHTML = createGhostVisualHTML();
+        document.body.appendChild(ghostEl);
+        
+        triggerHaptic([100, 50, 100, 50, 200]);
+        statusEl.textContent = 'Ой, страх! Возврат на старт.';
+        statusEl.style.color = '#ff4a6a';
+
+        setTimeout(() => {
+          if (ghostEl.parentNode) ghostEl.remove();
+          if (currentToken !== sessionToken) return;
+          isAnimating = false;
+          
+          if (lives <= 0) {
+            isGameOver = true;
+            revealAllGhostsOnEnd(false);
+            darknessEl.classList.add('victory');
+            statusEl.textContent = 'Вот где прятались все страхи 👀';
+            statusEl.style.color = '#ff4a6a';
+            triggerHaptic([200, 100, 200]);
+
+            setTimeout(() => {
+              if (currentToken !== sessionToken) return;
+              loseScreen.classList.add('active');
+            }, 3000);
+          } else {
+            playerRow = 0;
+            playerCol = 0;
+            facingLeft = false;
+            updateBoardVisuals();
+            updateLight();
+            scheduleGhostHint();
+            statusEl.textContent = 'Ищи другой путь!';
+            statusEl.style.color = '#888';
+          }
+        }, 1500);
+        return;
+      }
+
+      if (type === 0 || type === 3) {
+        playSoundHybrid('click', 0.6);
+        
+        playerRow = r;
+        playerCol = c;
+        
+        if (type === 3) {
+          isGameOver = true;
+          
+          bgMusic.pause();
+          playSoundHybrid('win', 0.8);
+
+          revealAllGhostsOnEnd(true);
+          darknessEl.classList.add('victory');
+          boardContainer.classList.add('victory-glow');
+          statusEl.textContent = 'Выход найден! Вот где прятались страхи 👀';
+          statusEl.style.color = '#f5c518';
+          triggerHaptic([80, 40, 120]);
+
+          setTimeout(() => {
+            if (currentToken !== sessionToken) return;
+            winScreen.classList.add('active');
+            startFireflies();
+            triggerHaptic([100, 50, 100, 50, 200]);
+          }, 3000);
+        } else {
+          triggerHaptic(20);
+          updateBoardVisuals();
+          updateLight();
+          scheduleGhostHint();
+        }
+      }
+    }
+
+    // =========================================================
+    // ПЕЩЕРНЫЕ СВЕТЛЯЧКИ С НАТУРАЛЬНЫМ ГРАДИЕНТНЫМ СВЕЧЕНИЕМ
+    // =========================================================
+    let firefliesAnimId = null;
+
+    function stopFireflies() {
+      if (firefliesAnimId) {
+        cancelAnimationFrame(firefliesAnimId);
+        firefliesAnimId = null;
+      }
+    }
+
+    function createGlowSprite(radius, innerColor, midColor) {
+      const size = Math.ceil(radius * 2);
+      const off = document.createElement('canvas');
+      off.width = size;
+      off.height = size;
+      const octx = off.getContext('2d');
+      const grad = octx.createRadialGradient(radius, radius, 0, radius, radius, radius);
+      grad.addColorStop(0, innerColor);
+      grad.addColorStop(0.28, midColor);
+      grad.addColorStop(1, 'rgba(255, 213, 79, 0)');
+      octx.fillStyle = grad;
+      octx.beginPath();
+      octx.arc(radius, radius, radius, 0, Math.PI * 2);
+      octx.fill();
+      return off;
+    }
+
+    function startFireflies() {
+      stopFireflies();
+      const canvas = document.getElementById('fireflies-canvas');
+      const ctx = canvas.getContext('2d');
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const fireflyGlowSprite = createGlowSprite(36, 'rgba(255, 250, 210, 0.95)', 'rgba(255, 224, 90, 0.42)');
+      const dustGlowSprite = createGlowSprite(8, 'rgba(255, 245, 180, 0.9)', 'rgba(255, 200, 60, 0.35)');
+
+      const COUNT = 22;
+      const MIN_SPEED = 0.45;
+      const MAX_SPEED = 2.1;
+
+      const flies = [];
+      const DUST_POOL = 90;
+      const dustParticles = [];
+
+      for (let i = 0; i < DUST_POOL; i++) {
+        dustParticles.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, r: 1, life: 0, decay: 0.025 });
+      }
+
+      function randomTargetVelocity() {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
+        return {
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed
+        };
+      }
+
+      for (let i = 0; i < COUNT; i++) {
+        const startVel = randomTargetVelocity();
+        const nextVel = randomTargetVelocity();
+        flies.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: startVel.vx,
+          vy: startVel.vy,
+          targetVx: nextVel.vx,
+          targetVy: nextVel.vy,
+          changeTimer: 40 + Math.floor(Math.random() * 140),
+          size: 1.8 + Math.random() * 2.4,
+          phase: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.02 + Math.random() * 0.03
+        });
+      }
+
+      function spawnDust(x, y, vx, vy) {
+        for (let i = 0; i < DUST_POOL; i++) {
+          const p = dustParticles[i];
+          if (!p.active) {
+            p.active = true;
+            p.x = x;
+            p.y = y;
+            p.vx = vx;
+            p.vy = vy;
+            p.r = 0.4 + Math.random() * 0.7;
+            p.life = 1.0;
+            p.decay = 0.022 + Math.random() * 0.02;
+            break;
+          }
+        }
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, w, h);
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (let i = 0; i < flies.length; i++) {
+          const f = flies[i];
+          f.changeTimer--;
+          if (f.changeTimer <= 0) {
+            const nextVel = randomTargetVelocity();
+            f.targetVx = nextVel.vx;
+            f.targetVy = nextVel.vy;
+            f.changeTimer = 60 + Math.floor(Math.random() * 160);
+          }
+
+          f.vx += (f.targetVx - f.vx) * 0.03;
+          f.vy += (f.targetVy - f.vy) * 0.03;
+          f.vx += (Math.random() - 0.5) * 0.04;
+          f.vy += (Math.random() - 0.5) * 0.04;
+
+          f.x += f.vx;
+          f.y += f.vy;
+
+          if (f.x < -20) f.x = w + 20;
+          if (f.x > w + 20) f.x = -20;
+          if (f.y < -20) f.y = h + 20;
+          if (f.y > h + 20) f.y = -20;
+
+          f.phase += f.pulseSpeed;
+          const alpha = 0.25 + 0.75 * ((Math.sin(f.phase) + 1) / 2);
+
+          if (alpha > 0.35 && Math.random() < 0.7) {
+            spawnDust(
+              f.x + (Math.random() - 0.5) * 3,
+              f.y + (Math.random() - 0.5) * 3,
+              -f.vx * 0.15 + (Math.random() - 0.5) * 0.45,
+              -f.vy * 0.15 + (Math.random() - 0.5) * 0.45
+            );
+          }
+
+          const drawSize = f.size * 15;
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(fireflyGlowSprite, f.x - drawSize / 2, f.y - drawSize / 2, drawSize, drawSize);
+
+          ctx.fillStyle = '#fffde7';
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, f.size * 0.85, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        for (let i = 0; i < DUST_POOL; i++) {
+          const p = dustParticles[i];
+          if (!p.active) continue;
+
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= p.decay;
+
+          if (p.life <= 0) {
+            p.active = false;
+            continue;
+          }
+
+          const dSize = p.r * 9 * p.life;
+          ctx.globalAlpha = p.life * 0.85;
+          ctx.drawImage(dustGlowSprite, p.x - dSize / 2, p.y - dSize / 2, dSize, dSize);
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        firefliesAnimId = requestAnimationFrame(animate);
+      }
+
+      animate();
+    }
+
+    buildBoardOnce();
+  </script>
+</body>
+</html>

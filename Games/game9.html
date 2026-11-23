@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Игра 9 (Конный спорт)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: #0a0f1e;
+    color: #fff;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 15px;
+  }
+  
+  /* Шапка */
+  .header { text-align: center; margin-bottom: 15px; flex-shrink: 0; position: relative; width: 100%; max-width: 500px; }
+  h2 { font-size: 21px; color: #f5c518; margin-bottom: 5px; line-height: 1.25; }
+  #score-display { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 1px; }
+
+  /* Кнопки управления (Пауза и Звук) */
+  .control-btn {
+    position: absolute; top: 14px; z-index: 100;
+    background: rgba(20, 28, 52, 0.85); border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff; font-size: 20px; width: 44px; height: 44px; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .control-btn:active { transform: scale(0.92) translateZ(0); }
+  #pause-btn { left: 14px; }
+  #mute-btn { right: 14px; }
+
+  /* Игровая зона */
+  #game-container {
+    position: relative;
+    width: 100%; max-width: 500px; height: 300px;
+    background: #0a1128;
+    border-radius: 20px;
+    border: 2px solid rgba(245, 197, 24, 0.35);
+    overflow: hidden;
+    cursor: pointer;
+    flex-shrink: 0;
+    touch-action: none;
+    transform: translateZ(0);
+  }
+
+  /* Пауза для CSS-анимаций */
+  #game-container.paused .star,
+  #game-container.paused .cloud,
+  #game-container.paused #ground {
+    animation-play-state: paused !important;
+  }
+
+  /* Замедление (Slow-Motion) в финале */
+  #game-container.slowmo #ground {
+    animation-duration: 2.2s !important;
+  }
+  #game-container.slowmo .cloud {
+    animation-duration: 50s !important;
+  }
+
+  /* Управление состояниями лошади (Бег / Прыжок / Пауза) */
+  .horse-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .horse-gif {
+    display: block;
+    transform: scaleX(-1);
+  }
+  .horse-jump {
+    display: none;
+    transform: scaleX(-1);
+  }
+  .horse-static {
+    display: none;
+  }
+
+  /* В прыжке показываем отзеркаленную horse_jump.png */
+  #jump-wrapper.jumping .horse-gif { display: none; }
+  #jump-wrapper.jumping .horse-jump { display: block; }
+
+  /* На паузе показываем статичную horse3.png */
+  #game-container.paused .horse-gif,
+  #game-container.paused .horse-jump { display: none !important; }
+  #game-container.paused .horse-static { display: block !important; }
+
+  /* --- НЕБО --- */
+  #sky-bg {
+    position: absolute; inset: 0; z-index: 0; overflow: hidden;
+    background: linear-gradient(to bottom, #0d1425 0%, #1b2138 60%, #1c2e4a 100%);
+  }
+  
+  .moon {
+    position: absolute; top: 14%; right: 15%;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #dcdcdc 70%, #999999 100%);
+    opacity: 0.9;
+  }
+
+  .star {
+    position: absolute; background: #fff; border-radius: 50%;
+    animation: twinkle linear infinite;
+    will-change: opacity;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.85; }
+  }
+  
+  .cloud {
+    position: absolute;
+    background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 70%);
+    border-radius: 50%;
+    animation: moveClouds linear infinite;
+    will-change: transform;
+  }
+  @keyframes moveClouds {
+    0% { transform: translate3d(520px, 0, 0); }
+    100% { transform: translate3d(-160px, 0, 0); }
+  }
+
+  /* --- ЗЕМЛЯ (ТРАВА) --- */
+  #ground {
+    position: absolute; bottom: 0; left: 0; width: 200%; height: 60px;
+    background: linear-gradient(to bottom, #2e7d32, #1b5e20);
+    border-top: 4px solid #4caf50;
+    animation: slide-ground 0.8s linear infinite;
+    will-change: transform;
+    z-index: 1; 
+  }
+  @keyframes slide-ground {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-50%, 0, 0); }
+  }
+
+  /* --- ЛЕС --- */
+  #forest {
+    position: absolute; inset: 0; overflow: hidden; pointer-events: none; 
+    z-index: 2; 
+  }
+
+  .tree {
+    position: absolute; bottom: 60px; left: 0;
+    width: 120px; height: 150px;
+    will-change: transform;
+    pointer-events: none;
+  }
+
+  .tree-shadow {
+    position: absolute; bottom: -14px; left: 50%; height: 12px;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 50%;
+    z-index: -1;
+  }
+
+  .tree-svg {
+    position: relative; z-index: 1; display: flex; justify-content: center;
+    align-items: flex-end; height: 150px; width: 120px;
+  }
+
+  /* --- БАРЬЕРЫ В ПЕРСПЕКТИВЕ --- */
+  .obstacle {
+    position: absolute; bottom: 30px; left: 0;
+    width: 50px; height: 45px;
+    will-change: transform, opacity;
+    z-index: 3; 
+  }
+  
+  .post.left {
+    position: absolute; left: 0; bottom: 12px; 
+    width: 6px; height: 30px; 
+    background: #7a5a44; 
+    border-radius: 2px;
+    z-index: 1;
+  }
+  
+  .post.right {
+    position: absolute; right: 0; bottom: 0;
+    width: 10px; height: 45px;
+    background: #8d6e63;
+    border-radius: 2px;
+    z-index: 3;
+  }
+  
+  .pole {
+    position: absolute; left: 5px;
+    width: 45px; height: 8px;
+    background: repeating-linear-gradient(45deg, #ff4a6a, #ff4a6a 10px, #ffffff 10px, #ffffff 20px);
+    border-radius: 2px;
+    z-index: 2;
+    transform-origin: 0% 50%;
+    transform: rotate(6deg);
+    border-top: 1px solid rgba(255,255,255,0.5);
+  }
+  .pole.top { bottom: 32px; transform: rotate(-3deg); }
+  .pole.mid { bottom: 16px; }
+
+  /* --- ЛОШАДЬ --- */
+  #jump-wrapper {
+    position: absolute; bottom: 30px; left: 30px; 
+    width: 140px; height: 100px;
+    z-index: 4;
+    will-change: transform;
+    transform-origin: bottom center;
+  }
+
+  #shadow {
+    position: absolute; bottom: 28px; left: 60px; 
+    width: 90px; height: 14px; background: rgba(0, 0, 0, 0.45);
+    border-radius: 50%;
+    will-change: transform, opacity;
+    z-index: 1;
+  }
+
+  /* Золотые финальные искры на трассе (Пул) */
+  #trail-sparks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 5;
+  }
+  .trail-spark {
+    position: absolute;
+    top: 0; left: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  #toast {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #ff4a6a; color: #fff; padding: 8px 16px; border-radius: 10px;
+    font-weight: 900; font-size: 16px; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s; white-space: nowrap; z-index: 40;
+  }
+  #toast.show { opacity: 1; }
+  #toast.finish-banner {
+    background: linear-gradient(135deg, #ffe066, #f5c518);
+    color: #10172b;
+    font-size: 18px;
+    padding: 10px 22px;
+    border: 2px solid #fff8cc;
+  }
+
+  #hit-flash {
+    position: absolute; inset: 0; background: #ff4a6a;
+    opacity: 0; pointer-events: none; z-index: 45;
+    transition: opacity 0.1s;
+  }
+  #hit-flash.active { opacity: 0.28; }
+
+  /* Экран победы с плавным появлением */
+  #win-screen {
+    position: fixed; inset: 0; background: rgba(10, 15, 30, 0.94);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 200; text-align: center; padding: 20px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.8s ease;
+  }
+  #win-screen.active { opacity: 1; pointer-events: auto; }
+  #win-screen h3 { color: #f5c518; font-size: 28px; margin-bottom: 14px; z-index: 10; }
+  .win-photo {
+    width: min(56vw, 190px); aspect-ratio: 1; border-radius: 50%; object-fit: cover;
+    border: 4px solid #f5c518;
+    margin-bottom: 18px; z-index: 10;
+    animation: pulse-photo 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse-photo { 0%, 100% { transform: scale(1) translateZ(0); } 50% { transform: scale(1.04) translateZ(0); } }
+  #win-screen p { font-size: 17px; margin-bottom: 22px; line-height: 1.45; max-width: 320px; color: #fff; z-index: 10; }
+
+  .end-buttons {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 230px; z-index: 10;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #f5c518, #ff9800);
+    color: #10172b; border: none; padding: 14px 32px; font-size: 16px;
+    font-weight: 900; font-family: inherit; border-radius: 50px; cursor: pointer;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out;
+  }
+  .btn:active { transform: scale(0.95) translateZ(0); }
+
+  .btn-next {
+    background: linear-gradient(135deg, #ffe066 0%, #f5c518 50%, #ff9800 100%);
+    border: 2px solid #fff5b8;
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+
+  #start-screen {
+    position: fixed; inset: 0; background: rgba(10, 15, 30, 0.96);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 300; text-align: center; padding: 20px;
+  }
+
+  #fireworks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+  .firework-particle {
+    position: absolute; top: 0; left: 0; border-radius: 50%; pointer-events: none;
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h2>Помоги всаднице перепрыгнуть препятствия!</h2>
+    <div id="score-display">Очки: 0 / 70</div>
+  </div>
+
+  <div id="game-container">
+    <button id="pause-btn" class="control-btn" title="Пауза">⏸️</button>
+    <button id="mute-btn" class="control-btn" title="Включить/выключить звук">🔊</button>
+
+    <div id="sky-bg"><div class="moon"></div></div>
+    <div id="forest"></div>
+    <div id="ground"></div>
+    <div id="shadow"></div>
+
+    <div id="jump-wrapper">
+      <img src="../pictures/horse.gif" class="horse-img horse-gif" alt="Лошадь бежит">
+      <img src="../pictures/horse_jump.png" class="horse-img horse-jump" alt="Лошадь прыгает">
+      <img src="../pictures/horse3.png" class="horse-img horse-static" alt="Лошадь на паузе">
+    </div>
+
+    <div id="trail-sparks"></div>
+
+    <div id="toast">Упс! Выше прыжок!</div>
+    <div id="hit-flash"></div>
+  </div>
+
+  <button class="btn" id="restart-main-btn" style="margin-top: 16px;">Начать заново</button>
+
+  <!-- Экран победы -->
+  <div id="win-screen">
+    <div id="fireworks"></div>
+    <h3>Невероятный прыжок! 🏆</h3>
+    <img class="win-photo" src="../photos/photo9_1.jpg" alt="Год 9" onerror="this.style.display='none'">
+    <p>В 9 лет ты уже уверенно держишься в седле и справляешься с уделами. Я уверен, что ты преодалеешь любые жизненные преграды!</p>
+    <div class="end-buttons">
+      <button class="btn btn-next" id="next-btn">Дальше</button>
+      <button class="btn btn-secondary" id="play-again-btn">Играть ещё</button>
+    </div>
+  </div>
+
+  <!-- Стартовый экран -->
+  <div id="start-screen">
+    <h3 style="color: #f5c518; margin-bottom: 12px; font-size: 24px;">Готовься к заезду!</h3>
+    <p style="color: #b8d4ff; margin-bottom: 24px; font-size: 15px; max-width: 280px;">Нажимай на экран, чтобы перепрыгивать барьеры.</p>
+    <button class="btn" id="start-btn">Начать</button>
+  </div>
+
+  <script>
+    const container = document.getElementById('game-container');
+    const jumpWrapper = document.getElementById('jump-wrapper');
+    const shadow = document.getElementById('shadow');
+    const scoreDisplay = document.getElementById('score-display');
+    const toast = document.getElementById('toast');
+    const hitFlash = document.getElementById('hit-flash');
+    const winScreen = document.getElementById('win-screen');
+    const startScreen = document.getElementById('start-screen');
+    const muteBtn = document.getElementById('mute-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const forestEl = document.getElementById('forest');
+    const skyBg = document.getElementById('sky-bg');
+    const groundEl = document.getElementById('ground');
+    const fireworksContainer = document.getElementById('fireworks');
+    const trailSparksContainer = document.getElementById('trail-sparks');
+
+    // =========================================================
+    // 1. ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/ + ФОНОВАЯ МУЗЫКА ../music/)
+    // =========================================================
+    const SOUND_PATHS = {
+      hoof: '../sounds/hors.mp3',
+      hit: '../sounds/ygreck.mp3',
+      win: '../sounds/win3.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const soundBuffers = { hit: null, win: null };
+    const isLocalFile = window.location.protocol === 'file:';
+    let isMuted = false;
+    let audioUnlocked = false;
+
+    const hoofSound = new Audio(SOUND_PATHS.hoof);
+    hoofSound.loop = true;
+    hoofSound.volume = 0.5;
+    hoofSound.preload = 'auto';
+
+    // Фоновая музыка
+    const bgMusic = new Audio('../music/lube_kon_5.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.55;
+    bgMusic.preload = 'auto';
+    let isBgMusicStarted = false;
+
+    function startBgMusic() {
+      if (isMuted || isPaused || isGameOver || isFinishing) return;
+      if (bgMusic.paused) {
+        bgMusic.play().then(() => {
+          isBgMusicStarted = true;
+        }).catch(() => {});
+      }
+    }
+
+    function pauseBgMusic() {
+      try { bgMusic.pause(); } catch (e) {}
+    }
+
+    const htmlAudioFallback = {
+      hit: new Audio(SOUND_PATHS.hit),
+      win: new Audio(SOUND_PATHS.win)
+    };
+    Object.values(htmlAudioFallback).forEach(a => { a.preload = 'auto'; });
+
+    async function loadBuffer(key, url) {
+      if (!audioCtx || isLocalFile) return;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = await res.arrayBuffer();
+        soundBuffers[key] = await audioCtx.decodeAudioData(buf);
+      } catch (e) {
+        soundBuffers[key] = null;
+      }
+    }
+    loadBuffer('hit', SOUND_PATHS.hit);
+    loadBuffer('win', SOUND_PATHS.win);
+
+    function unlockAudio() {
+      if (!audioUnlocked) {
+        audioUnlocked = true;
+        if (audioCtx) {
+          if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+          try {
+            const b = audioCtx.createBuffer(1, 1, 22050);
+            const s = audioCtx.createBufferSource();
+            s.buffer = b;
+            s.connect(audioCtx.destination);
+            s.start(0);
+          } catch (e) {}
+        }
+      }
+      if (!isBgMusicStarted && !isMuted && !isPaused && !isGameOver && !isFinishing) {
+        startBgMusic();
+      }
+    }
+
+    function playSound(key, volume = 0.7) {
+      if (isMuted) return;
+      const buf = soundBuffers[key];
+      if (audioCtx && buf && !isLocalFile) {
+        const playNow = () => {
+          try {
+            const src = audioCtx.createBufferSource();
+            const gain = audioCtx.createGain();
+            gain.gain.value = volume;
+            src.buffer = buf;
+            src.connect(gain);
+            gain.connect(audioCtx.destination);
+            src.start(audioCtx.currentTime + 0.01);
+          } catch (e) {
+            playFallback(key, volume);
+          }
+        };
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(playNow).catch(() => playFallback(key, volume));
+        } else {
+          playNow();
+        }
+      } else {
+        playFallback(key, volume);
+      }
+    }
+
+    function playFallback(key, volume) {
+      const a = htmlAudioFallback[key];
+      if (!a) return;
+      try {
+        a.pause();
+        a.currentTime = 0;
+        a.volume = volume;
+        a.muted = isMuted;
+        a.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    function playJumpTone() {
+      if (isMuted || !audioCtx) return;
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        const now = audioCtx.currentTime + 0.01;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(480, now + 0.14);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      } catch (e) {}
+    }
+
+    function playScoreTone() {
+      if (isMuted || !audioCtx) return;
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        const now = audioCtx.currentTime + 0.01;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.setValueAtTime(880, now + 0.07);
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.23);
+      } catch (e) {}
+    }
+
+    // =========================================================
+    // 2. НАСТРОЙКИ ИГРЫ И КЭШИРОВАНИЕ РАЗМЕРОВ
+    // =========================================================
+    let score = 0;
+    const TARGET_SCORE = 70;
+    const POINTS_PER_JUMP = 5;
+
+    let isJumping = false;
+    let jumpVelocity = 0;
+    const GRAVITY = 1950;
+    const JUMP_FORCE = -680;
+    let playerY = 0;
+
+    let isGameOver = false;
+    let isPaused = false;
+    let isFinishing = false; // Режим 4-секундного красивого финала
+    let finishTimer = 0;
+    let finishScreenShown = false;
+    let horseFinishX = 0;
+    let sparkAccumulator = 0;
+    let speed = 300;
+    let containerW = 500;
+
+    let gameLoopId = null;
+    let lastTime = 0;
+    let nextObstacleTimer = 0;
+    let nextTreeTimer = 0;
+
+    function updateContainerSize() {
+      const w = container.clientWidth;
+      if (w > 0) containerW = w;
+    }
+    window.addEventListener('resize', updateContainerSize);
+
+    // =========================================================
+    // 3. ОБЪЕКТНЫЕ ПУЛЫ (БАРЬЕРЫ, ДЕРЕВЬЯ, ЗОЛОТЫЕ ИСКРЫ И САЛЮТ)
+    // =========================================================
+    const OBSTACLE_POOL_SIZE = 6;
+    const TREE_POOL_SIZE = 10;
+    const TRAIL_SPARK_POOL_SIZE = 75;
+    const FIREWORK_POOL_SIZE = 80;
+
+    const obstaclePool = [];
+    const treePool = [];
+    const trailSparkPool = [];
+    const fireworkPool = [];
+    let fireworkAnimId = null;
+    let fireworkTimers = [];
+
+    function initPools() {
+      const obsFrag = document.createDocumentFragment();
+      for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        el.className = 'obstacle';
+        el.innerHTML = '<div class="post left"></div><div class="pole top"></div><div class="pole mid"></div><div class="post right"></div>';
+        el.style.transform = 'translate3d(-9999px, 0, 0)';
+        obstaclePool.push({
+          el,
+          active: false,
+          x: 0,
+          hit: false,
+          passed: false,
+          hitAnimTimer: 0
+        });
+        obsFrag.appendChild(el);
+      }
+      container.appendChild(obsFrag);
+
+      const treeFrag = document.createDocumentFragment();
+      for (let i = 0; i < TREE_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        el.className = 'tree';
+        el.style.transform = 'translate3d(-9999px, 0, 0)';
+
+        const shadowEl = document.createElement('div');
+        shadowEl.className = 'tree-shadow';
+
+        const svgWrapper = document.createElement('div');
+        svgWrapper.className = 'tree-svg';
+
+        if (i % 2 === 0) {
+          shadowEl.style.width = '45px';
+          svgWrapper.innerHTML = '<svg width="120" height="150" viewBox="-60 -150 120 150"><path d="M 0,-25 C 22,-50 15,-125 0,-125 C -15,-125 -22,-50 0,-25 Z" fill="#4caf50" opacity="0.9"/><path d="M -4,0 L 4,0 L 4,-20 L 0,-60 L -4,-20 Z" fill="#f0f0f0"/><rect x="-2" y="-15" width="3" height="2" fill="#222"/><rect x="0" y="-8" width="3" height="2" fill="#222"/></svg>';
+        } else {
+          shadowEl.style.width = '55px';
+          svgWrapper.innerHTML = '<svg width="120" height="150" viewBox="-60 -150 120 150"><ellipse cx="0" cy="-85" rx="28" ry="25" fill="#2e7d32" opacity="0.9"/><rect x="-5" y="-65" width="10" height="65" fill="#5c3a21"/></svg>';
+        }
+
+        el.appendChild(shadowEl);
+        el.appendChild(svgWrapper);
+        treePool.push({ el, active: false, x: 0, speedFactor: 0.75 });
+        treeFrag.appendChild(el);
+      }
+      forestEl.appendChild(treeFrag);
+
+      // Пул золотых искр на трассе для 4-секундного финала
+      const sparkFrag = document.createDocumentFragment();
+      for (let i = 0; i < TRAIL_SPARK_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        el.className = 'trail-spark';
+        el.style.opacity = '0';
+        el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+        trailSparkPool.push({
+          el,
+          active: false,
+          x: 0, y: 0,
+          vx: 0, vy: 0,
+          life: 0, decay: 0.9
+        });
+        sparkFrag.appendChild(el);
+      }
+      trailSparksContainer.appendChild(sparkFrag);
+
+      // Пул частиц салюта для экрана победы
+      const fwFrag = document.createDocumentFragment();
+      for (let i = 0; i < FIREWORK_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        el.className = 'firework-particle';
+        el.style.opacity = '0';
+        el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+        fireworkPool.push({
+          el,
+          active: false,
+          x: 0, y: 0,
+          vx: 0, vy: 0,
+          life: 0, decay: 1.2
+        });
+        fwFrag.appendChild(el);
+      }
+      fireworksContainer.appendChild(fwFrag);
+    }
+
+    function createSkyDecor() {
+      for (let i = 0; i < 16; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        const size = (1 + Math.random() * 1.8).toFixed(1);
+        star.style.width = size + 'px';
+        star.style.height = size + 'px';
+        star.style.left = (Math.random() * 100).toFixed(1) + '%';
+        star.style.top = (Math.random() * 58).toFixed(1) + '%';
+        const dur = (2.5 + Math.random() * 3.5).toFixed(1);
+        star.style.animationDuration = dur + 's';
+        star.style.animationDelay = `-${(Math.random() * 3).toFixed(1)}s`;
+        skyBg.appendChild(star);
+      }
+      for (let i = 0; i < 3; i++) {
+        const cloud = document.createElement('div');
+        cloud.className = 'cloud';
+        const size = Math.round(70 + Math.random() * 50);
+        cloud.style.width = size + 'px';
+        cloud.style.height = Math.round(size * 0.6) + 'px';
+        cloud.style.top = Math.round(12 + i * 14) + '%';
+        const dur = 22 + i * 7;
+        cloud.style.animationDuration = dur + 's';
+        cloud.style.animationDelay = `-${i * 6}s`;
+        skyBg.appendChild(cloud);
+      }
+    }
+
+    function spawnTrailSparks(x, y, count = 4) {
+      const colors = ['#fff59d', '#ffe066', '#f5c518', '#ff9800', '#ffffff'];
+      let spawned = 0;
+      for (let i = 0; i < TRAIL_SPARK_POOL_SIZE && spawned < count; i++) {
+        const s = trailSparkPool[i];
+        if (s.active) continue;
+
+        const size = Math.round(4 + Math.random() * 5);
+        s.active = true;
+        s.x = x + (Math.random() - 0.5) * 32;
+        s.y = y + (Math.random() - 0.5) * 28;
+        s.vx = -35 - Math.random() * 75;
+        s.vy = -30 - Math.random() * 65;
+        s.life = 1.0;
+        // Долгая жизнь искр (около 1.2 - 1.8 сек), чтобы шлейф красиво тянулся
+        s.decay = 0.55 + Math.random() * 0.35;
+
+        s.el.style.width = size + 'px';
+        s.el.style.height = size + 'px';
+        s.el.style.background = colors[Math.floor(Math.random() * colors.length)];
+        s.el.style.opacity = '1';
+        s.el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
+        spawned++;
+      }
+    }
+
+    function spawnObstacle() {
+      if (isGameOver || isPaused || isFinishing) return;
+      for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
+        const obs = obstaclePool[i];
+        if (!obs.active) {
+          obs.active = true;
+          obs.x = containerW + 30;
+          obs.hit = false;
+          obs.passed = false;
+          obs.hitAnimTimer = 0;
+          obs.el.style.opacity = '1';
+          obs.el.style.transform = `translate3d(${obs.x.toFixed(1)}px, 0, 0)`;
+          break;
+        }
+      }
+      nextObstacleTimer = 1.35 + Math.random() * 1.45;
+    }
+
+    function spawnTree() {
+      if (isGameOver || isPaused) return;
+      const startIndex = Math.floor(Math.random() * TREE_POOL_SIZE);
+      for (let offset = 0; offset < TREE_POOL_SIZE; offset++) {
+        const t = treePool[(startIndex + offset) % TREE_POOL_SIZE];
+        if (!t.active) {
+          t.active = true;
+          t.x = containerW + 60;
+          t.speedFactor = 0.65 + Math.random() * 0.25;
+          const scale = (0.75 + Math.random() * 0.45).toFixed(2);
+          t.scale = scale;
+          t.el.style.transform = `translate3d(${t.x.toFixed(1)}px, 0, 0) scale(${scale})`;
+          break;
+        }
+      }
+      nextTreeTimer = 0.9 + Math.random() * 0.9;
+    }
+
+    // =========================================================
+    // 4. УПРАВЛЕНИЕ И ЛОГИКА ИГРЫ
+    // =========================================================
+    muteBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      unlockAudio();
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      hoofSound.muted = isMuted;
+      bgMusic.muted = isMuted;
+      Object.values(htmlAudioFallback).forEach(a => { a.muted = isMuted; });
+      if (isMuted) {
+        pauseBgMusic();
+      } else if (!isPaused && !isGameOver && !isFinishing) {
+        startBgMusic();
+      }
+    });
+
+    pauseBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (isGameOver || isFinishing) return;
+      isPaused = !isPaused;
+      if (isPaused) {
+        pauseBtn.textContent = '▶️';
+        container.classList.add('paused');
+        hoofSound.pause();
+        pauseBgMusic();
+        if (gameLoopId) {
+          cancelAnimationFrame(gameLoopId);
+          gameLoopId = null;
+        }
+      } else {
+        pauseBtn.textContent = '⏸️';
+        container.classList.remove('paused');
+        if (!isJumping && !isMuted) {
+          hoofSound.play().catch(() => {});
+        }
+        startBgMusic();
+        lastTime = performance.now();
+        gameLoopId = requestAnimationFrame(update);
+      }
+    });
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+      unlockAudio();
+      startScreen.style.display = 'none';
+      initGame();
+    });
+
+    document.getElementById('restart-main-btn').addEventListener('click', () => {
+      unlockAudio();
+      initGame();
+    });
+
+    document.getElementById('play-again-btn').addEventListener('click', () => {
+      unlockAudio();
+      initGame();
+    });
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      stopFireworks();
+      hoofSound.pause();
+      pauseBgMusic();
+      htmlAudioFallback.win.pause();
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        pauseBgMusic();
+      } else if (!isMuted && !isPaused && !isGameOver && !isFinishing && startScreen.style.display === 'none') {
+        startBgMusic();
+      }
+    });
+
+    function initGame() {
+      stopFireworks();
+      winScreen.classList.remove('active');
+      container.classList.remove('paused', 'slowmo');
+      toast.classList.remove('show', 'finish-banner');
+      toast.textContent = 'Упс! Выше прыжок!';
+      pauseBtn.textContent = '⏸️';
+      pauseBtn.style.display = 'flex';
+
+      isGameOver = false;
+      isPaused = false;
+      isFinishing = false;
+      finishTimer = 0;
+      finishScreenShown = false;
+      horseFinishX = 0;
+      sparkAccumulator = 0;
+
+      score = 0;
+      playerY = 0;
+      isJumping = false;
+      jumpVelocity = 0;
+      speed = 300;
+      updateContainerSize();
+
+      updateScoreDisplay();
+      jumpWrapper.classList.remove('jumping');
+      jumpWrapper.style.transform = 'translate3d(0, 0, 0)';
+      shadow.style.transform = 'translate3d(0, 0, 0) scale(1)';
+      shadow.style.opacity = '1';
+      groundEl.style.animationDuration = '0.8s';
+
+      for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
+        obstaclePool[i].active = false;
+        obstaclePool[i].el.style.transform = 'translate3d(-9999px, 0, 0)';
+      }
+      for (let i = 0; i < TREE_POOL_SIZE; i++) {
+        treePool[i].active = false;
+        treePool[i].el.style.transform = 'translate3d(-9999px, 0, 0)';
+      }
+      for (let i = 0; i < TRAIL_SPARK_POOL_SIZE; i++) {
+        trailSparkPool[i].active = false;
+        trailSparkPool[i].el.style.opacity = '0';
+        trailSparkPool[i].el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+      }
+
+      if (gameLoopId) {
+        cancelAnimationFrame(gameLoopId);
+        gameLoopId = null;
+      }
+
+      hoofSound.currentTime = 0;
+      if (!isMuted) {
+        hoofSound.play().catch(() => {});
+      }
+      if (startScreen.style.display === 'none') {
+        startBgMusic();
+      }
+
+      nextObstacleTimer = 0.8;
+      nextTreeTimer = 0.2;
+      lastTime = performance.now();
+      gameLoopId = requestAnimationFrame(update);
+    }
+
+    function jump(e) {
+      if (e && e.target && e.target.closest('.control-btn')) return;
+      unlockAudio();
+      if (!isJumping && !isGameOver && !isPaused && !isFinishing) {
+        isJumping = true;
+        jumpVelocity = JUMP_FORCE;
+        jumpWrapper.classList.add('jumping');
+        hoofSound.pause();
+        playJumpTone();
+        if (navigator.vibrate) {
+          try { navigator.vibrate(20); } catch (err) {}
+        }
+      }
+    }
+
+    container.addEventListener('pointerdown', jump);
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        if (startScreen.style.display === 'none') jump();
+      }
+    });
+
+    function update(now) {
+      if (isGameOver || isPaused) return;
+
+      const rawDt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      // В режиме 4-секундного финала: первые 1.5 сек сильное замедление (0.28x), затем плавный выход на торжественный галоп (0.65x)
+      let timeScale = 1.0;
+      if (isFinishing) {
+        timeScale = finishTimer < 1.5 ? 0.28 : 0.65;
+      }
+      const dt = rawDt * timeScale;
+
+      if (!isFinishing && score >= 40 && speed === 300) {
+        speed = 390;
+        groundEl.style.animationDuration = '0.55s';
+      }
+
+      // 1. Физика прыжка и финальный 4-секундный галоп за правый край экрана
+      if (isFinishing) {
+        finishTimer += rawDt;
+
+        // После приземления всадница равномерно скачет вправо через весь экран (около 2.6 сек пути)
+        if (!isJumping) {
+          horseFinishX += 205 * rawDt;
+        } else {
+          // В замедленном полёте над последним барьером тоже слегка продвигается вперёд
+          horseFinishX += 35 * rawDt;
+        }
+
+        // Постоянно сыпем крупные золотые искры из-под копыт и за всадницей
+        sparkAccumulator += rawDt;
+        if (sparkAccumulator >= 0.045) {
+          sparkAccumulator = 0;
+          const horseCenterX = 30 + horseFinishX + 65;
+          const horseCenterY = 300 - 30 + playerY - 40;
+          spawnTrailSparks(horseCenterX, horseCenterY, 3);
+        }
+
+        // Финал длится ~4.2 секунды, пока лошадь красиво ускачет за правый край экрана
+        if (!finishScreenShown && (horseFinishX > containerW + 60 || finishTimer >= 4.2)) {
+          finishScreenShown = true;
+          completeVictory();
+          return;
+        }
+      }
+
+      if (isJumping || isFinishing) {
+        if (isJumping) {
+          playerY += jumpVelocity * dt;
+          jumpVelocity += GRAVITY * dt;
+
+          if (playerY >= 0) {
+            playerY = 0;
+            jumpVelocity = 0;
+            isJumping = false;
+            jumpWrapper.classList.remove('jumping');
+            if (!isGameOver && !isPaused && !isMuted && hoofSound.paused) {
+              hoofSound.play().catch(() => {});
+            }
+          }
+        }
+
+        const tiltDeg = isJumping ? Math.max(-14, Math.min(10, jumpVelocity * 0.02)) : 0;
+        jumpWrapper.style.transform = `translate3d(${horseFinishX.toFixed(1)}px, ${playerY.toFixed(1)}px, 0) rotate(${tiltDeg.toFixed(1)}deg)`;
+
+        const heightAboveGround = Math.max(0, -playerY);
+        const shadowScale = Math.max(0.35, 1 - heightAboveGround / 130);
+        const shadowOpacity = Math.max(0.15, 1 - heightAboveGround / 130);
+        shadow.style.transform = `translate3d(${horseFinishX.toFixed(1)}px, 0, 0) scale(${shadowScale.toFixed(2)})`;
+        shadow.style.opacity = shadowOpacity.toFixed(2);
+      }
+
+      // 2. Движение деревьев
+      if (!isFinishing) {
+        nextTreeTimer -= dt;
+        if (nextTreeTimer <= 0) spawnTree();
+      }
+
+      for (let i = 0; i < TREE_POOL_SIZE; i++) {
+        const t = treePool[i];
+        if (!t.active) continue;
+        t.x -= speed * t.speedFactor * dt;
+        if (t.x < -140) {
+          t.active = false;
+          t.el.style.transform = 'translate3d(-9999px, 0, 0)';
+        } else {
+          t.el.style.transform = `translate3d(${t.x.toFixed(1)}px, 0, 0) scale(${t.scale})`;
+        }
+      }
+
+      // 3. Барьеры
+      if (!isFinishing) {
+        nextObstacleTimer -= dt;
+        if (nextObstacleTimer <= 0) spawnObstacle();
+      }
+
+      const pLeft = 75 + horseFinishX;
+      const pRight = 125 + horseFinishX;
+      const pBottom = 260 + playerY;
+
+      for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
+        const obs = obstaclePool[i];
+        if (!obs.active) continue;
+
+        if (obs.hit) {
+          obs.hitAnimTimer -= dt;
+          if (obs.hitAnimTimer <= 0) {
+            obs.active = false;
+            obs.el.style.transform = 'translate3d(-9999px, 0, 0)';
+          }
+          continue;
+        }
+
+        obs.x -= speed * dt;
+        obs.el.style.transform = `translate3d(${obs.x.toFixed(1)}px, 0, 0)`;
+
+        if (!isFinishing) {
+          const oLeft = obs.x + 6;
+          const oRight = obs.x + 44;
+          const oTop = 228;
+
+          if (pRight > oLeft && pLeft < oRight && pBottom > oTop) {
+            obs.hit = true;
+            obs.passed = true;
+            obs.hitAnimTimer = 0.25;
+            handleHit(obs);
+            continue;
+          }
+
+          if (oRight < pLeft - 8 && !obs.passed) {
+            obs.passed = true;
+            score += POINTS_PER_JUMP;
+            updateScoreDisplay();
+            playScoreTone();
+            if (navigator.vibrate) {
+              try { navigator.vibrate(20); } catch (err) {}
+            }
+            if (score >= TARGET_SCORE) {
+              startCinematicFinish();
+            }
+          }
+        }
+
+        if (obs.x < -80) {
+          obs.active = false;
+          obs.el.style.transform = 'translate3d(-9999px, 0, 0)';
+        }
+      }
+
+      // 4. Обновление золотых финальных искр на трассе
+      for (let i = 0; i < TRAIL_SPARK_POOL_SIZE; i++) {
+        const s = trailSparkPool[i];
+        if (!s.active) continue;
+
+        s.x += s.vx * rawDt;
+        s.y += s.vy * rawDt;
+        s.vy += 85 * rawDt;
+        s.life -= s.decay * rawDt;
+
+        if (s.life <= 0) {
+          s.active = false;
+          s.el.style.opacity = '0';
+          s.el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+        } else {
+          s.el.style.opacity = s.life.toFixed(2);
+          s.el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
+        }
+      }
+
+      gameLoopId = requestAnimationFrame(update);
+    }
+
+    function handleHit(obs) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate([50, 50, 100]); } catch (err) {}
+      }
+      playSound('hit', 0.7);
+
+      toast.classList.remove('finish-banner');
+      toast.textContent = 'Упс! Выше прыжок!';
+      toast.classList.add('show');
+      hitFlash.classList.add('active');
+      setTimeout(() => {
+        toast.classList.remove('show');
+        hitFlash.classList.remove('active');
+      }, 750);
+
+      obs.el.style.transform = `translate3d(${obs.x.toFixed(1)}px, 18px, 0) scale(0.5) rotate(20deg)`;
+      obs.el.style.opacity = '0';
+    }
+
+    function updateScoreDisplay() {
+      scoreDisplay.textContent = `Очки: ${score} / ${TARGET_SCORE}`;
+    }
+
+    // Старт 4-секундного замедленного финала после перепрыгивания последнего барьера
+    function startCinematicFinish() {
+      if (isFinishing || isGameOver) return;
+      isFinishing = true;
+      finishTimer = 0;
+      finishScreenShown = false;
+      horseFinishX = 0;
+      pauseBtn.style.display = 'none';
+      pauseBgMusic();
+
+      container.classList.add('slowmo');
+
+      // Сразу звучат победные фанфары и появляется баннер финиша
+      playSound('win', 0.8);
+      toast.textContent = 'Финиш! Великолепно! 🏆';
+      toast.classList.add('show', 'finish-banner');
+
+      // Первый залп золотых искр прямо над всадницей
+      spawnTrailSparks(95, 220 + playerY, 22);
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate([80, 40, 120]); } catch (err) {}
+      }
+    }
+
+    // Завершение заезда и плавное открытие экрана победы
+    function completeVictory() {
+      isGameOver = true;
+      isFinishing = false;
+      if (gameLoopId) {
+        cancelAnimationFrame(gameLoopId);
+        gameLoopId = null;
+      }
+
+      hoofSound.pause();
+      pauseBgMusic();
+      toast.classList.remove('show', 'finish-banner');
+      winScreen.classList.add('active');
+      launchFireworks();
+      if (navigator.vibrate) {
+        try { navigator.vibrate([100, 50, 100, 50, 200]); } catch (err) {}
+      }
+    }
+
+    // =========================================================
+    // 5. ПУЛ САЛЮТА НА ЭКРАНЕ ПОБЕДЫ
+    // =========================================================
+    function stopFireworks() {
+      fireworkTimers.forEach(id => clearTimeout(id));
+      fireworkTimers = [];
+      if (fireworkAnimId) {
+        cancelAnimationFrame(fireworkAnimId);
+        fireworkAnimId = null;
+      }
+      for (let i = 0; i < FIREWORK_POOL_SIZE; i++) {
+        fireworkPool[i].active = false;
+        fireworkPool[i].el.style.opacity = '0';
+        fireworkPool[i].el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+      }
+    }
+
+    function launchFireworks() {
+      stopFireworks();
+      const colors = ['#f5c518', '#ff4a6a', '#4a9eff', '#ff9800', '#aaffb0', '#ff99cc', '#ffffff'];
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+
+      for (let b = 0; b < 8; b++) {
+        const tid = setTimeout(() => {
+          const cx = screenW * (0.15 + Math.random() * 0.7);
+          const cy = screenH * (0.15 + Math.random() * 0.55);
+          let spawned = 0;
+
+          for (let i = 0; i < FIREWORK_POOL_SIZE && spawned < 14; i++) {
+            const p = fireworkPool[i];
+            if (p.active) continue;
+
+            const angle = (Math.PI * 2 * spawned) / 14 + (Math.random() - 0.5) * 0.4;
+            const spd = 90 + Math.random() * 160;
+            const size = Math.round(5 + Math.random() * 5);
+
+            p.active = true;
+            p.x = cx;
+            p.y = cy;
+            p.vx = Math.cos(angle) * spd;
+            p.vy = Math.sin(angle) * spd;
+            p.life = 1.0;
+            p.decay = 0.8 + Math.random() * 0.4;
+
+            p.el.style.width = size + 'px';
+            p.el.style.height = size + 'px';
+            p.el.style.background = colors[Math.floor(Math.random() * colors.length)];
+            p.el.style.opacity = '1';
+            p.el.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0)`;
+            spawned++;
+          }
+        }, b * 280);
+        fireworkTimers.push(tid);
+      }
+
+      let lastFwTime = performance.now();
+      function animateFireworks(now) {
+        const dt = Math.min((now - lastFwTime) / 1000, 0.05);
+        lastFwTime = now;
+        let anyActive = false;
+
+        for (let i = 0; i < FIREWORK_POOL_SIZE; i++) {
+          const p = fireworkPool[i];
+          if (!p.active) continue;
+          anyActive = true;
+
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 150 * dt;
+          p.life -= p.decay * dt;
+
+          if (p.life <= 0) {
+            p.active = false;
+            p.el.style.opacity = '0';
+            p.el.style.transform = 'translate3d(-9999px, -9999px, 0)';
+          } else {
+            p.el.style.opacity = p.life.toFixed(2);
+            p.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0)`;
+          }
+        }
+
+        if (anyActive || fireworkTimers.length > 0) {
+          fireworkAnimId = requestAnimationFrame(animateFireworks);
+        }
+      }
+      fireworkAnimId = requestAnimationFrame(animateFireworks);
+    }
+
+    createSkyDecor();
+    initPools();
+  </script>
+</body>
+</html>

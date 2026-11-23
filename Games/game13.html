@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>АпоКакалипсис</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a252f;
+            font-family: 'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        #canvasContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            background: linear-gradient(to bottom, #6bb9f0, #9b8df2);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            max-width: 100%;
+            max-height: 100%;
+            touch-action: none;
+            display: block;
+        }
+
+        /* Кнопки управления (Пауза и Звук) */
+        .top-controls {
+            position: absolute;
+            top: max(12px, env(safe-area-inset-top));
+            right: 12px;
+            display: flex;
+            gap: 8px;
+            z-index: 8;
+        }
+        .hud-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.55);
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            color: #fff;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            touch-action: manipulation;
+        }
+        .hud-btn.muted {
+            opacity: 0.55;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .hud-btn:active {
+            transform: scale(0.92);
+        }
+
+        .overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 15;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .overlay.active {
+            display: flex;
+        }
+        .overlay h1 {
+            font-size: clamp(28px, 7vw, 38px);
+            margin-bottom: 12px;
+            text-shadow: 3px 3px #000;
+        }
+        .overlay p {
+            font-size: clamp(15px, 4vw, 18px);
+            margin-bottom: 24px;
+            max-width: 400px;
+            line-height: 1.45;
+        }
+        .overlay button {
+            padding: 15px 35px;
+            font-size: 20px;
+            background: #00b894;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 6px #00876c;
+            font-weight: bold;
+            margin: 6px 0;
+            min-width: 240px;
+            touch-action: manipulation;
+        }
+        .overlay button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px #00876c;
+        }
+        .overlay button.btn-gold {
+            background: linear-gradient(135deg, #f5c518, #ff9800);
+            color: #10172b;
+            box-shadow: 0 6px #c67600;
+        }
+        .overlay button.btn-gold:active {
+            box-shadow: 0 2px #c67600;
+        }
+        .overlay button.btn-secondary {
+            background: rgba(255, 255, 255, 0.14);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 4px rgba(0, 0, 0, 0.4);
+            font-size: 16px;
+            padding: 12px 28px;
+        }
+        #gameOverOverlay button {
+            background: #d63031;
+            box-shadow: 0 6px #b33939;
+        }
+        #gameOverOverlay button:active {
+            box-shadow: 0 2px #b33939;
+        }
+        #pauseOverlay {
+            background: rgba(0, 0, 0, 0.68);
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvasContainer">
+    <div class="top-controls">
+        <button id="pauseBtn" class="hud-btn" title="Пауза">⏸️</button>
+        <button id="musicBtn" class="hud-btn" title="Фоновая музыка">🎵</button>
+        <button id="muteBtn" class="hud-btn" title="Звуковые эффекты">🔊</button>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="800"></canvas>
+
+    <div id="startOverlay" class="overlay active">
+        <h1>💩 АпоКаКаЛипсис 💩</h1>
+        <p>Лови падающие неожиданности в пакет, горшок и унитаз, а в финале уворачивайся от гигантских проблем!</p>
+        <button id="startBtn" class="btn-gold">НАЧАТЬ</button>
+    </div>
+
+    <div id="pauseOverlay" class="overlay">
+        <h1>⏸️ ПАУЗА</h1>
+        <p>Переведи дух и продолжай!</p>
+        <button id="resumeBtn" class="btn-gold">ПРОДОЛЖИТЬ</button>
+    </div>
+    
+    <div id="winOverlay" class="overlay">
+        <h1>🎉 ПРЕКРАСНО! 🎉</h1>
+        <p>Ты устранила все неприятности и смогла увернуться от больших проблем! Пусть они тебя не беспокоят!</p>
+        <button id="nextQuestBtn" class="btn-gold">ДАЛЬШЕ</button>
+        <button id="winReplayBtn" class="btn-secondary">ИГРАТЬ СНОВА</button>
+    </div>
+
+    <div id="gameOverOverlay" class="overlay">
+        <h1>💀 ИГРА ОКОНЧЕНА 💀</h1>
+        <p id="failReason">У тебя закончились средства защиты!</p>
+        <button id="retryBtn">ПОПРОБОВАТЬ СНОВА</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startOverlay = document.getElementById('startOverlay');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const winOverlay = document.getElementById('winOverlay');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const failReasonText = document.getElementById('failReason');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const musicBtn = document.getElementById('musicBtn');
+
+    // =========================================================
+    // ФОНОВАЯ МУЗЫКА
+    // =========================================================
+    const bgMusic = new Audio('../music/posol_fon_kakahi.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.35;
+    bgMusic.preload = 'auto';
+
+    let isMusicEnabled = true;
+    let isMusicStarted = false;
+
+    function startBgMusic() {
+        if (!isMusicEnabled) return;
+        if (bgMusic.paused) {
+            bgMusic.play().then(() => {
+                isMusicStarted = true;
+            }).catch(() => {});
+        }
+    }
+
+    function toggleBgMusic() {
+        isMusicEnabled = !isMusicEnabled;
+        if (isMusicEnabled) {
+            musicBtn.textContent = '🎵';
+            musicBtn.classList.remove('muted');
+            startBgMusic();
+        } else {
+            musicBtn.textContent = '🚫';
+            musicBtn.classList.add('muted');
+            bgMusic.pause();
+        }
+    }
+
+    // =========================================================
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА + СИНТЕЗАТОР ЭФФЕКТОВ ПАДЕНИЯ
+    // =========================================================
+    const soundFiles = {
+        miss: '../sounds/krestik2.mp3',
+        levelup: '../sounds/win1.mp3',
+        win: '../sounds/win3.mp3',
+        gameover: '../sounds/ygreck.mp3'
+    };
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    const soundBuffers = {};
+    const htmlAudioPool = {};
+    const isLocalFile = window.location.protocol === 'file:';
+    let isAudioUnlocked = false;
+    let isMuted = false;
+
+    Object.keys(soundFiles).forEach(key => {
+        const a = new Audio(soundFiles[key]);
+        a.preload = 'auto';
+        htmlAudioPool[key] = a;
+    });
+
+    async function loadSoundBuffer(key, url) {
+        if (!audioCtx || isLocalFile) return;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const arrayBuffer = await response.arrayBuffer();
+            soundBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+        } catch (e) {
+            soundBuffers[key] = null;
+        }
+    }
+
+    function unlockAudioEngine() {
+        if (!audioCtx && AudioCtx) {
+            try { audioCtx = new AudioCtx(); } catch (e) {}
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+        if (!isAudioUnlocked && audioCtx) {
+            isAudioUnlocked = true;
+            try {
+                const buffer = audioCtx.createBuffer(1, 1, 22050);
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                source.start(0);
+            } catch (e) {}
+            Object.keys(soundFiles).forEach(key => loadSoundBuffer(key, soundFiles[key]));
+        }
+        if (isMusicEnabled && !isMusicStarted) {
+            startBgMusic();
+        }
+    }
+
+    function playHtmlAudioFallback(key, volume) {
+        const audio = htmlAudioPool[key];
+        if (!audio) return;
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = volume;
+            audio.muted = isMuted;
+            audio.play().catch(() => {});
+        } catch (e) {}
+    }
+
+    function playSoundHybrid(key, volume = 0.6) {
+        if (isMuted) return;
+        unlockAudioEngine();
+
+        const buffer = soundBuffers[key];
+        if (audioCtx && buffer && !isLocalFile) {
+            const startBuffer = () => {
+                try {
+                    const source = audioCtx.createBufferSource();
+                    const gainNode = audioCtx.createGain();
+                    gainNode.gain.value = volume;
+                    source.buffer = buffer;
+                    source.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    source.start(audioCtx.currentTime + 0.005);
+                } catch (e) {
+                    playHtmlAudioFallback(key, volume);
+                }
+            };
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(startBuffer).catch(() => playHtmlAudioFallback(key, volume));
+            } else {
+                startBuffer();
+            }
+        } else {
+            playHtmlAudioFallback(key, volume);
+        }
+    }
+
+    // --- ВСТРОЕННЫЙ СИНТЕЗАТОР ЗВУКОВ ПАДЕНИЯ И ПОПАДАНИЯ ---
+    function playSynthEffect(effectType) {
+        if (isMuted) return;
+        unlockAudioEngine();
+        if (!audioCtx) return;
+
+        const runSynth = () => {
+            try {
+                const now = audioCtx.currentTime;
+
+                if (effectType === 'bag') {
+                    // Уровень 1: Шуршащий шлёп в пакет (шумовой импульс + мягкий низкий шлепок)
+                    const dur = 0.14;
+                    const bufSize = Math.floor(audioCtx.sampleRate * dur);
+                    const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+                    const data = noiseBuf.getChannelData(0);
+                    for (let i = 0; i < bufSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
+                    }
+                    const noise = audioCtx.createBufferSource();
+                    noise.buffer = noiseBuf;
+
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.setValueAtTime(1800, now);
+                    filter.Q.value = 1.6;
+
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.32, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + dur);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    noise.start(now);
+
+                    // Мягкий глухой удар
+                    const osc = audioCtx.createOscillator();
+                    const oscGain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(170, now);
+                    osc.frequency.exponentialRampToValueAtTime(65, now + 0.09);
+                    oscGain.gain.setValueAtTime(0.25, now);
+                    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                    osc.connect(oscGain);
+                    oscGain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                }
+                else if (effectType === 'pot') {
+                    // Уровень 2: Гулкий пластиковый «тук» в горшок
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(115, now + 0.07);
+                    osc.frequency.exponentialRampToValueAtTime(165, now + 0.14);
+
+                    gain.gain.setValueAtTime(0.38, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.16);
+                }
+                else if (effectType === 'toilet') {
+                    // Уровень 3: Сочный водный «плюх-бульк» в унитаз
+                    const osc1 = audioCtx.createOscillator();
+                    const gain1 = audioCtx.createGain();
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(290, now);
+                    osc1.frequency.exponentialRampToValueAtTime(95, now + 0.06);
+                    osc1.frequency.exponentialRampToValueAtTime(480, now + 0.19);
+
+                    gain1.gain.setValueAtTime(0.35, now);
+                    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+
+                    osc1.connect(gain1);
+                    gain1.connect(audioCtx.destination);
+                    osc1.start(now);
+                    osc1.stop(now + 0.22);
+
+                    // Второй маленький пузырёк
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(340, now + 0.09);
+                    osc2.frequency.exponentialRampToValueAtTime(640, now + 0.23);
+
+                    gain2.gain.setValueAtTime(0.22, now + 0.09);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.start(now + 0.09);
+                    osc2.stop(now + 0.25);
+                }
+                else if (effectType === 'splat_ground') {
+                    // Уровень 4: Тяжёлый глухой «шмяк» слоновьей лепёшки об землю
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(115, now);
+                    osc.frequency.exponentialRampToValueAtTime(36, now + 0.22);
+
+                    gain.gain.setValueAtTime(0.42, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                }
+                else if (effectType === 'splat_hit') {
+                    // Уровень 4: Мощный «шмяк» при попадании лепёшки в человечка
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(42, now + 0.28);
+
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(650, now);
+
+                    gain.gain.setValueAtTime(0.36, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.31);
+                }
+            } catch (e) {}
+        };
+
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().then(runSynth).catch(() => {});
+        } else {
+            runSynth();
+        }
+    }
+
+    function triggerHaptic(pattern) {
+        if (navigator.vibrate) {
+            try { navigator.vibrate(pattern); } catch (e) {}
+        }
+    }
+
+    // =========================================================
+    // КОНФИГУРАЦИЯ УРОВНЕЙ (ОРИГИНАЛЬНАЯ СКОРОСТЬ СОХРАНЕНА)
+    // =========================================================
+    const levels = {
+        1: {
+            name: "1. Двор 🐕",
+            buttType: "dog",
+            hunterType: "bag",
+            lifeIcon: "🧹",
+            targetScore: 10,
+            buttSpeed: 4,
+            poopSpeed: 4.5,
+            spawnInterval: 1000,
+            poopSizeMultiplier: 0.7,
+            action: "catch"
+        },
+        2: {
+            name: "2. Детская 👶",
+            buttType: "baby",
+            hunterType: "pot",
+            lifeIcon: "👶",
+            targetScore: 12,
+            buttSpeed: 5,
+            poopSpeed: 5.5,
+            spawnInterval: 850,
+            poopSizeMultiplier: 0.9,
+            action: "catch"
+        },
+        3: {
+            name: "3. Взрослый 🍑",
+            buttType: "butt",
+            hunterType: "toilet",
+            lifeIcon: "🧻",
+            targetScore: 15,
+            buttSpeed: 6,
+            poopSpeed: 6.5,
+            spawnInterval: 750,
+            poopSizeMultiplier: 1.2,
+            action: "catch"
+        },
+        4: {
+            name: "4. ПРОБЛЕМЫ! 🐘",
+            nameTop: "СПАСАЙСЯ КТО МОЖЕТ!",
+            buttType: "elephant",
+            hunterType: "human",
+            lifeIcon: "🧼",
+            targetScore: 20,
+            buttSpeed: 7,
+            poopSpeed: 7.5,
+            spawnInterval: 650,
+            poopSizeMultiplier: 3.5,
+            action: "dodge"
+        }
+    };
+
+    let state = {
+        level: 1,
+        score: 0,
+        lives: 3,
+        buttX: 200,
+        buttY: 100,
+        buttDir: 1,
+        buttAngle: 0,
+        basketX: 250,
+        basketWidth: 100,
+        basketHeight: 90,
+        poops: [],
+        particles: [],
+        keys: {},
+        isStarted: false,
+        isPaused: false,
+        isGameOver: false,
+        evolutionTextTimer: 0,
+        humanDirtyTimer: 0
+    };
+
+    // Лёгкие облака для улучшения фона без нагрузки на GPU
+    const clouds = [
+        { x: 60, y: 125, r: 34, speed: 0.35 },
+        { x: 320, y: 95, r: 42, speed: 0.25 },
+        { x: 510, y: 155, r: 28, speed: 0.45 }
+    ];
+
+    // Кэширование геометрии холста для плавного управления пальцем
+    let cachedRect = null;
+    function updateCanvasRect() {
+        cachedRect = canvas.getBoundingClientRect();
+    }
+    window.addEventListener('resize', updateCanvasRect);
+    window.addEventListener('orientationchange', () => setTimeout(updateCanvasRect, 120));
+
+    // Слушатели управления
+    window.addEventListener('keydown', e => {
+        if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+            togglePause();
+            return;
+        }
+        state.keys[e.key] = true;
+    });
+    window.addEventListener('keyup', e => state.keys[e.key] = false);
+
+    function handlePointer(e) {
+        if (!state.isStarted || state.isPaused || state.isGameOver) return;
+        if (e.cancelable) e.preventDefault();
+        if (!cachedRect || cachedRect.width === 0) updateCanvasRect();
+        const touchX = (e.clientX - cachedRect.left) * (canvas.width / cachedRect.width);
+        if (!isNaN(touchX) && isFinite(touchX)) {
+            state.basketX = touchX - state.basketWidth / 2;
+        }
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+        unlockAudioEngine();
+        handlePointer(e);
+    }, { passive: false });
+    canvas.addEventListener('pointermove', handlePointer, { passive: false });
+
+    // Кнопки интерфейса
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('resumeBtn').addEventListener('click', togglePause);
+    document.getElementById('retryBtn').addEventListener('click', resetGame);
+    document.getElementById('winReplayBtn').addEventListener('click', resetGame);
+    document.getElementById('nextQuestBtn').addEventListener('click', () => {
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+        }
+    });
+
+    pauseBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        togglePause();
+    });
+
+    musicBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        unlockAudioEngine();
+        toggleBgMusic();
+    });
+
+    muteBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        unlockAudioEngine();
+        isMuted = !isMuted;
+        muteBtn.textContent = isMuted ? '🔇' : '🔊';
+        Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
+    });
+
+    function togglePause() {
+        if (!state.isStarted || state.isGameOver) return;
+        state.isPaused = !state.isPaused;
+        if (state.isPaused) {
+            pauseBtn.textContent = '▶️';
+            pauseOverlay.classList.add('active');
+        } else {
+            pauseBtn.textContent = '⏸️';
+            pauseOverlay.classList.remove('active');
+            updateCanvasRect();
+        }
+    }
+
+    function startGame() {
+        unlockAudioEngine();
+        startBgMusic();
+        triggerHaptic(20);
+        startOverlay.classList.remove('active');
+        state.isStarted = true;
+        updateCanvasRect();
+        resetGame();
+    }
+
+    // Система генерации какашек
+    let spawnTimer = null;
+
+    function restartSpawnTimer() {
+        if (spawnTimer) clearInterval(spawnTimer);
+        spawnTimer = setInterval(spawnPoop, levels[state.level].spawnInterval);
+    }
+
+    function spawnPoop() {
+        if (!state.isStarted || state.isPaused || state.isGameOver || state.evolutionTextTimer > 0) return;
+        
+        const lvlCfg = levels[state.level];
+        const baseSize = (12 + Math.random() * 8) * lvlCfg.poopSizeMultiplier;
+        const stretchX = 0.85 + Math.random() * 0.4;
+        const stretchY = 0.85 + Math.random() * 0.3;
+
+        let spawnOffsetX = 50;
+        if (lvlCfg.buttType === 'elephant') spawnOffsetX = 40;
+        if (lvlCfg.buttType === 'dog') spawnOffsetX = 15;
+
+        state.poops.push({
+            x: state.buttX + spawnOffsetX,
+            y: state.buttY + (lvlCfg.buttType === 'elephant' ? 60 : 35),
+            radius: baseSize,
+            scaleX: stretchX,
+            scaleY: stretchY,
+            wobble: Math.random() * Math.PI * 2
+        });
+    }
+
+    function spawnParticles(x, y, color, count = 8) {
+        for (let i = 0; i < count; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: (Math.random() - 0.8) * 7,
+                radius: 2 + Math.random() * 4,
+                alpha: 1,
+                color: color
+            });
+        }
+    }
+
+    // ОТРИСОВКА ФОНА (ОБЛАКА И ГАЗОН)
+    function drawBackground() {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        for (let i = 0; i < clouds.length; i++) {
+            const c = clouds[i];
+            if (state.isStarted && !state.isPaused && !state.isGameOver) {
+                c.x += c.speed;
+                if (c.x - c.r * 2 > canvas.width) c.x = -c.r * 2;
+            }
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+            ctx.arc(c.x + c.r * 0.75, c.y - c.r * 0.2, c.r * 0.8, 0, Math.PI * 2);
+            ctx.arc(c.x + c.r * 1.45, c.y + c.r * 0.05, c.r * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Газон внизу
+        ctx.fillStyle = '#10ac84';
+        ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+        ctx.fillStyle = '#1dd1a1';
+        ctx.fillRect(0, canvas.height - 30, canvas.width, 8);
+
+        // Декоративные пучки травы
+        ctx.fillStyle = '#0d8a6a';
+        for (let gx = 20; gx < canvas.width; gx += 48) {
+            ctx.beginPath();
+            ctx.moveTo(gx, canvas.height - 22);
+            ctx.lineTo(gx - 5, canvas.height - 34);
+            ctx.lineTo(gx + 1, canvas.height - 22);
+            ctx.lineTo(gx + 6, canvas.height - 35);
+            ctx.lineTo(gx + 9, canvas.height - 22);
+            ctx.fill();
+        }
+    }
+
+    // ОТРИСОВКА СУЩЕСТВ СВЕРХУ
+    function drawTopCreature(x, y, type) {
+        ctx.save();
+        ctx.translate(x, y);
+        state.buttAngle = Math.sin(Date.now() * 0.008) * 0.12;
+        
+        if (type === 'dog') {
+            ctx.translate(40, 20); 
+            ctx.rotate(state.buttAngle);
+            ctx.fillStyle = '#e67e22'; 
+            ctx.strokeStyle = '#d35400';
+            ctx.lineWidth = 2;
+
+            ctx.fillRect(-20, 15, 6, 12);
+            ctx.fillRect(-8, 15, 6, 12);
+            ctx.fillRect(8, 15, 6, 12);
+            ctx.fillRect(20, 15, 6, 12);
+
+            ctx.beginPath(); ctx.ellipse(0, 0, 30, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(-28, -12, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(-38, -10, 8, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#000000'; ctx.beginPath(); ctx.arc(-45, -10, 2.5, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = '#d35400';
+            ctx.beginPath(); ctx.ellipse(-24, -14, 5, 10, Math.PI / 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(-32, -15, 2, 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(25, -5); ctx.quadraticCurveTo(40, -20, 32, -30); ctx.stroke();
+        } 
+        else if (type === 'baby') {
+            ctx.translate(50, 20); ctx.rotate(state.buttAngle * 0.5);
+            ctx.fillStyle = '#ffcca3';
+            ctx.beginPath(); ctx.arc(-15, 5, 22, 0, Math.PI*2); ctx.arc(15, 5, 22, 0, Math.PI*2); ctx.fill();
+            ctx.fillRect(-30, -20, 60, 25);
+            ctx.fillStyle = '#fdcb6e'; ctx.beginPath(); ctx.arc(0, -22, 8, 0, Math.PI*2); ctx.fill();
+        } 
+        else if (type === 'butt') {
+            ctx.translate(50, 20); ctx.rotate(state.buttAngle);
+            ctx.fillStyle = '#ffcca3';
+            ctx.beginPath(); ctx.arc(-24, 0, 35, 0, Math.PI*2); ctx.arc(24, 0, 35, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#e0a370'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(0, 28); ctx.stroke();
+        } 
+        else if (type === 'elephant') {
+            ctx.translate(80, 30); ctx.fillStyle = '#fd79a8';
+            ctx.beginPath(); ctx.arc(0, 0, 55, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(45, -20, 30, 0, Math.PI*2); ctx.fill();
+            ctx.fillRect(55, -20, 15, 45); ctx.fillStyle = '#e84393';
+            ctx.beginPath(); ctx.ellipse(25, -25, 22, 16, Math.PI/4, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(52, -26, 4, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // ОТРИСОВКА КАКАШЕК С БЛИКОМ И ЛЁГКИМ ПОКАЧИВАНИЕМ
+    function drawPoop(poop) {
+        ctx.save();
+        ctx.translate(poop.x, poop.y);
+        const tilt = Math.sin(poop.wobble + poop.y * 0.03) * 0.08;
+        ctx.rotate(tilt);
+        ctx.scale(poop.scaleX, poop.scaleY);
+        ctx.fillStyle = '#783e19'; ctx.strokeStyle = '#4a250f'; ctx.lineWidth = 2.5;
+
+        const r = poop.radius;
+        ctx.beginPath(); ctx.ellipse(0, 10, r * 1.3, r * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -2, r * 1.05, r * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -12, r * 0.7, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-r * 0.3, -15); ctx.quadraticCurveTo(0, -28, r * 0.1, -25); ctx.quadraticCurveTo(0, -16, r * 0.3, -15); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+        // Светлый блик для объёма
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.beginPath(); ctx.ellipse(-r * 0.35, 8, r * 0.32, r * 0.16, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-r * 0.25, -3, r * 0.24, r * 0.13, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+
+    // ОТРИСОВКА ЛОВЦА И ТЕНИ ПОД НИМ
+    function drawHunter(x, y, type) {
+        ctx.save();
+        const w = state.basketWidth;
+        const h = state.basketHeight;
+
+        // Тень на траве под ловцом
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, canvas.height - 20, w * 0.45, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (type === 'bag') {
+            ctx.fillStyle = '#2d3436'; ctx.strokeStyle = '#000000'; ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + 10, y + 10); ctx.quadraticCurveTo(x, y + h, x + 20, y + h);
+            ctx.lineTo(x + w - 20, y + h); ctx.quadraticCurveTo(x + w, y + h, x + w - 10, y + 10);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x + 18, y + 10, 10, Math.PI, 0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x + w - 18, y + 10, 10, Math.PI, 0); ctx.stroke();
+        } 
+        else if (type === 'pot') {
+            let bodyGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+            bodyGrad.addColorStop(0, '#ff6b81'); bodyGrad.addColorStop(1, '#b31e33');
+            ctx.fillStyle = bodyGrad; ctx.strokeStyle = '#cc2e43'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(x + 5, y + 15); ctx.quadraticCurveTo(x, y + h - 10, x + 15, y + h); ctx.lineTo(x + w - 15, y + h); ctx.quadraticCurveTo(x + w, y + h - 10, x + w - 5, y + 15); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#ff879b'; ctx.beginPath(); ctx.ellipse(x + w/2, y + 15, w/2, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(x + 22, y + h/2 + 5, 6, 22, Math.PI/10, 0, Math.PI*2); ctx.fill();
+        } 
+        else if (type === 'toilet') {
+            ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 4;
+
+            let tankGrad = ctx.createLinearGradient(x, y, x + 35, y + h);
+            tankGrad.addColorStop(0, '#ffffff'); tankGrad.addColorStop(1, '#b2bec3');
+            ctx.fillStyle = tankGrad;
+            ctx.fillRect(x, y - 20, 35, 75); ctx.strokeRect(x, y - 20, 35, 75);
+
+            ctx.fillStyle = '#bdc3c7';
+            ctx.beginPath(); ctx.arc(x + 17, y - 10, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            let footGrad = ctx.createLinearGradient(x + 35, y + 50, x + w, y + h);
+            footGrad.addColorStop(0, '#ffffff'); footGrad.addColorStop(1, '#bdc3c7');
+            ctx.fillStyle = footGrad;
+            ctx.fillRect(x + 45, y + 55, w - 60, h - 55); ctx.strokeRect(x + 45, y + 55, w - 60, h - 55);
+
+            let bowlGrad = ctx.createLinearGradient(x + 35, y + 15, x + w, y + 60);
+            bowlGrad.addColorStop(0, '#ffffff'); bowlGrad.addColorStop(0.5, '#f5f6fa'); bowlGrad.addColorStop(1, '#7f8c8d');
+            ctx.fillStyle = bowlGrad;
+            ctx.beginPath();
+            ctx.moveTo(x + 35, y + 15); ctx.quadraticCurveTo(x + 40, y + 58, x + 60, y + 58);
+            ctx.lineTo(x + w - 15, y + 58); ctx.quadraticCurveTo(x + w, y + 58, x + w, y + 15);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = '#48dbfb';
+            ctx.beginPath(); ctx.ellipse(x + 35 + (w - 35) / 2, y + 30, (w - 45) / 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+            let seatGrad = ctx.createLinearGradient(x + 35, y + 15, x + w, y + 15);
+            seatGrad.addColorStop(0, '#ffffff'); seatGrad.addColorStop(1, '#b2bec3');
+            ctx.fillStyle = seatGrad;
+            ctx.beginPath(); ctx.ellipse(x + 35 + (w - 35) / 2, y + 15, (w - 35) / 2, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(x + 45, y + 26, 6, 14);
+        } 
+        else if (type === 'human') {
+            ctx.translate(x + w/2, y + h/2);
+            let skinColor = state.humanDirtyTimer > 0 ? '#783e19' : '#ffcca3';
+            let clothColor = state.humanDirtyTimer > 0 ? '#5c2d0c' : '#3498db';
+
+            ctx.strokeStyle = skinColor; ctx.lineWidth = 5; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(-25, -25); ctx.moveTo(15, 0); ctx.lineTo(25, -25); ctx.stroke();
+            let legAnim = Math.sin(Date.now() * 0.02) * 15;
+            ctx.beginPath(); ctx.moveTo(-8, 20); ctx.lineTo(-12 + legAnim, 40); ctx.moveTo(8, 20); ctx.lineTo(12 - legAnim, 40); ctx.stroke();
+            ctx.fillStyle = clothColor; ctx.fillRect(-12, -10, 24, 30);
+            ctx.fillStyle = skinColor; ctx.beginPath(); ctx.arc(0, -22, 12, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#000000'; ctx.beginPath(); ctx.arc(-4, -24, 2, 0, Math.PI*2); ctx.arc(4, -24, 2, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#000000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, -18, 3, 0, Math.PI*2); ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ КАДРОВ (ОРИГИНАЛЬНАЯ СКОРОСТЬ)
+    function update() {
+        if (!state.isStarted || state.isGameOver) return;
+
+        if (state.isPaused) {
+            requestAnimationFrame(update);
+            return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground();
+
+        const lvlCfg = levels[state.level];
+
+        // 1. Движение существа сверху
+        state.buttX += lvlCfg.buttSpeed * state.buttDir;
+        const creatureWidth = lvlCfg.buttType === 'elephant' ? 160 : 100;
+
+        if (state.buttX <= 0) {
+            state.buttX = 0;
+            state.buttDir = 1;
+        } else if (state.buttX >= canvas.width - creatureWidth) {
+            state.buttX = canvas.width - creatureWidth;
+            state.buttDir = -1;
+        }
+
+        // 2. Движение клавиатурой
+        if (state.keys['ArrowLeft']) state.basketX -= 9;
+        if (state.keys['ArrowRight']) state.basketX += 9;
+
+        if (lvlCfg.hunterType === 'toilet') {
+            state.basketWidth = 140; state.basketHeight = 115;
+        } else if (lvlCfg.hunterType === 'human') {
+            state.basketWidth = 60; state.basketHeight = 80;
+        } else {
+            state.basketWidth = 100; state.basketHeight = 90;
+        }
+
+        if (state.basketX < 0) state.basketX = 0;
+        if (state.basketX > canvas.width - state.basketWidth) state.basketX = canvas.width - state.basketWidth;
+
+        const basketY = canvas.height - state.basketHeight - 20;
+
+        // 3. Отрисовка существа и ловца
+        drawTopCreature(state.buttX, state.buttY, lvlCfg.buttType);
+        
+        if (!isNaN(state.basketX) && isFinite(state.basketX)) {
+            drawHunter(state.basketX, basketY, lvlCfg.hunterType);
+        }
+
+        if (state.evolutionTextTimer > 0) state.evolutionTextTimer--;
+        if (state.humanDirtyTimer > 0) state.humanDirtyTimer--;
+
+        // 4. Логика падения, ловли и уклонения
+        for (let i = state.poops.length - 1; i >= 0; i--) {
+            let p = state.poops[i];
+            p.y += lvlCfg.poopSpeed;
+
+            drawPoop(p);
+
+            if (p.y + p.radius >= basketY && p.y - p.radius <= basketY + 30) {
+                const horizontalRadius = p.radius * p.scaleX;
+                
+                if (!isNaN(state.basketX) && p.x + horizontalRadius >= state.basketX && p.x - horizontalRadius <= state.basketX + state.basketWidth) {
+                    state.poops.splice(i, 1);
+                    
+                    if (lvlCfg.action === "catch") {
+                        let particleColor = '#7f8c8d'; 
+                        if (lvlCfg.hunterType === 'pot') particleColor = '#ff6b81';
+                        if (lvlCfg.hunterType === 'toilet') particleColor = '#48dbfb'; 
+                        
+                        // Звук падения в пакет, горшок или унитаз!
+                        playSynthEffect(lvlCfg.hunterType);
+                        triggerHaptic(20);
+                        spawnParticles(p.x, basketY, particleColor, 10);
+                        handleScore();
+                    } else {
+                        // Попадание слоновьей лепёшки в человека!
+                        state.humanDirtyTimer = 45;
+                        playSynthEffect('splat_hit');
+                        triggerHaptic([60, 40, 80]);
+                        spawnParticles(p.x, basketY + 20, '#783e19', 15);
+                        handleLifeLoss();
+                    }
+                    continue;
+                }
+            }
+
+            // Какашка или лепёшка упала на газон
+            if (p.y > canvas.height - 25) {
+                if (lvlCfg.action === "dodge" && !p.groundSplatted) {
+                    // Звук и брызги при падении лепёшки на землю на 4 уровне
+                    p.groundSplatted = true;
+                    playSynthEffect('splat_ground');
+                    spawnParticles(p.x, canvas.height - 28, '#783e19', 8);
+                }
+            }
+
+            if (p.y > canvas.height + 40) {
+                state.poops.splice(i, 1);
+                
+                if (lvlCfg.action === "catch") {
+                    playSoundHybrid('miss', 0.45);
+                    triggerHaptic([40, 40, 40]);
+                    handleLifeLoss();
+                } else {
+                    handleScore();
+                }
+            }
+        }
+
+        // 5. Отрисовка частиц
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let pt = state.particles[i];
+            pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.25; 
+            pt.alpha -= 0.02;
+            
+            ctx.save();
+            ctx.globalAlpha = pt.alpha;
+            ctx.fillStyle = pt.color;
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            if (pt.alpha <= 0) state.particles.splice(i, 1);
+        }
+
+        // 6. ОТРИСОВКА ИНТЕРФЕЙСА
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.fillRect(0, 0, canvas.width, 68);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px Arial Black, sans-serif';
+        const topText = lvlCfg.action === "dodge" ? `${lvlCfg.nameTop}` : `${lvlCfg.name}`;
+        ctx.fillText(topText, 15, 42);
+
+        ctx.fillStyle = '#fdcb6e';
+        const scoreText = lvlCfg.action === "dodge" ? `Увороты: ${state.score} / ${lvlCfg.targetScore}` : `Поймано: ${state.score} / ${lvlCfg.targetScore}`;
+        ctx.fillText(scoreText, canvas.width - 285, 42);
+
+        // Жизни
+        ctx.font = '24px Arial, sans-serif';
+        let livesStr = "";
+        for (let l = 0; l < state.lives; l++) {
+            livesStr += lvlCfg.lifeIcon + " ";
+        }
+        ctx.fillText(livesStr, 15, 102);
+
+        // Заставка нового уровня
+        if (state.evolutionTextTimer > 0) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+            ctx.fillRect(0, 300, canvas.width, 150);
+            
+            ctx.fillStyle = '#fdcb6e';
+            ctx.font = '32px Arial Black, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText("НОВЫЙ УРОВЕНЬ!", canvas.width / 2, 365);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '22px Arial Black, sans-serif';
+            ctx.fillText(lvlCfg.name, canvas.width / 2, 415);
+            ctx.textAlign = 'left'; 
+        }
+
+        requestAnimationFrame(update);
+    }
+
+    function handleScore() {
+        if (state.evolutionTextTimer > 0) return;
+        
+        state.score++;
+        const lvlCfg = levels[state.level];
+
+        if (state.score >= lvlCfg.targetScore) {
+            if (state.level < 4) {
+                state.level++;
+                state.score = 0;
+                state.poops = [];
+                state.evolutionTextTimer = 90; 
+                
+                playSoundHybrid('levelup', 0.65);
+                triggerHaptic([40, 30, 60]);
+                spawnParticles(canvas.width / 2, canvas.height / 2, '#f1c40f', 40);
+
+                restartSpawnTimer();
+            } else {
+                state.isGameOver = true;
+                if (spawnTimer) clearInterval(spawnTimer);
+                playSoundHybrid('win', 0.8);
+                triggerHaptic([100, 50, 100, 50, 200]);
+                winOverlay.classList.add('active');
+            }
+        }
+    }
+
+    function handleLifeLoss() {
+        if (state.evolutionTextTimer > 0) return;
+
+        state.lives--;
+        if (state.lives <= 0) {
+            state.isGameOver = true;
+            if (spawnTimer) clearInterval(spawnTimer);
+            playSoundHybrid('gameover', 0.75);
+            triggerHaptic([150, 80, 200]);
+            
+            const lvlCfg = levels[state.level];
+            if (lvlCfg.action === "dodge") {
+                failReasonText.innerHTML = "Тебя накрыло проблемами! Постарайся увернуться от них. Полотенца кончились! 🧼";
+            } else {
+                failReasonText.innerHTML = `Слишком много неожиданностей пропущено. Твои средства защиты (${lvlCfg.lifeIcon}) закончились!`;
+            }
+            gameOverOverlay.classList.add('active');
+        }
+    }
+
+    function resetGame() {
+        state.level = 1;
+        state.score = 0;
+        state.lives = 3;
+        state.poops = [];
+        state.particles = [];
+        state.buttX = 200;
+        state.basketX = 250;
+        state.basketWidth = 100;
+        state.basketHeight = 90;
+        state.evolutionTextTimer = 90; 
+        state.isPaused = false;
+        state.isGameOver = false;
+        pauseBtn.textContent = '⏸️';
+
+        pauseOverlay.classList.remove('active');
+        winOverlay.classList.remove('active');
+        gameOverOverlay.classList.remove('active');
+
+        updateCanvasRect();
+        restartSpawnTimer();
+        requestAnimationFrame(update);
+    }
+
+    updateCanvasRect();
+</script>
+
+</body>
+</html>

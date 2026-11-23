@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Тест: Игра 12 (Тетрис)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Nunito', 'Segoe UI', Roboto, sans-serif;
+    background: #0a0f1e;
+    color: #fff;
+    height: 100dvh; overflow: hidden;
+    display: flex; flex-direction: column;
+    touch-action: none;
+  }
+
+  /* === ШАПКА === */
+  header {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border-bottom: 1px solid rgba(245, 197, 24, 0.25);
+  }
+  .stat { display: flex; flex-direction: column; align-items: center; padding: 2px 5px; }
+  .stat .label { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .val { font-size: 16px; font-weight: 900; color: #f5c518; }
+  #next-piece-mini {
+    width: 42px; height: 42px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 1px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(245, 197, 24, 0.35);
+    border-radius: 6px;
+    padding: 2px;
+    margin-left: auto;
+  }
+  #next-piece-mini > div { border-radius: 2px; }
+  .ctrl-btn {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff; font-size: 16px;
+    border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation;
+    position: relative;
+  }
+  .ctrl-btn:active { transform: scale(0.92); }
+  .ctrl-btn.muted::after {
+    content: "";
+    position: absolute;
+    width: 24px;
+    height: 2px;
+    background: #ff4a6a;
+    transform: rotate(-45deg);
+    border-radius: 2px;
+  }
+
+  /* === ИГРОВАЯ ЗОНА === */
+  #game-area {
+    flex: 1; min-height: 0;
+    display: flex; justify-content: center; align-items: center;
+    padding: 8px;
+  }
+  #board-wrapper { position: relative; touch-action: none; }
+  #board {
+    width: 100%; height: 100%;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(16, 1fr);
+    gap: 1.5px;
+    background: #060b18;
+    border: 2px solid rgba(245, 197, 24, 0.4);
+    border-radius: 10px;
+    padding: 3px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+  }
+  .cell {
+    position: relative;
+    background: rgba(255, 255, 255, 0.025);
+    border-radius: 3px;
+  }
+  /* Объёмная текстура фишек */
+  .cell.filled {
+    border-top: 2px solid rgba(255, 255, 255, 0.55);
+    border-left: 2px solid rgba(255, 255, 255, 0.35);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.45);
+    border-right: 2px solid rgba(0, 0, 0, 0.35);
+  }
+  .cell.active-piece {
+    z-index: 4;
+  }
+  /* Подсказка места падения: сплошной тонкий бледно-голубой контур без пунктира */
+  .cell.ghost {
+    z-index: 2;
+    background: rgba(147, 197, 253, 0.10) !important;
+    border: 1.5px solid rgba(147, 197, 253, 0.42) !important;
+    box-shadow: none !important;
+  }
+  /* Свечение исчезающих линий */
+  .cell.clearing {
+    animation: clearFlash 0.35s ease-out forwards;
+    z-index: 5;
+  }
+  @keyframes clearFlash {
+    0% {
+      background: #ffffff !important;
+      box-shadow: 0 0 22px #ffffff, 0 0 42px #f5c518;
+      transform: scale(1.12);
+    }
+    60% {
+      background: #ffffff !important;
+      box-shadow: 0 0 32px #ffffff, 0 0 55px #f5c518;
+      transform: scale(1);
+    }
+    100% {
+      background: #ffffff !important;
+      transform: scale(0.1);
+      opacity: 0;
+    }
+  }
+
+  /* === КНОПКИ УПРАВЛЕНИЯ === */
+  #controls {
+    flex-shrink: 0;
+    display: flex; gap: 6px;
+    padding: 8px 12px 14px;
+    justify-content: center;
+  }
+  .ctrl {
+    flex: 1; max-width: 64px;
+    height: 54px;
+    font-size: 24px; font-weight: 900;
+    background: rgba(245, 197, 24, 0.12);
+    border: 2px solid rgba(245, 197, 24, 0.4);
+    color: #f5c518;
+    border-radius: 12px; cursor: pointer;
+    touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+  .ctrl:active { background: rgba(245, 197, 24, 0.3); transform: scale(0.93); }
+  .ctrl.hard {
+    background: rgba(255, 74, 106, 0.16);
+    border-color: rgba(255, 74, 106, 0.5);
+    color: #ff4a6a;
+  }
+  .ctrl.hard:active { background: rgba(255, 74, 106, 0.35); }
+
+  /* === ОВЕРЛЕИ === */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(10, 15, 30, 0.95);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100; text-align: center; padding: 20px;
+  }
+  .overlay.active { display: flex; }
+  .overlay h3 { color: #f5c518; font-size: 26px; margin-bottom: 15px; z-index: 10; }
+  .overlay p { font-size: 16px; margin-bottom: 20px; line-height: 1.5; max-width: 320px; color: #fff; z-index: 10; }
+
+  #pause-overlay {
+    background: rgba(6, 11, 24, 0.55) !important;
+    pointer-events: none;
+  }
+  #pause-overlay h3 {
+    text-shadow: 0 3px 12px rgba(0, 0, 0, 0.95);
+  }
+  #pause-overlay .btn {
+    pointer-events: auto;
+  }
+
+  .win-photo {
+    width: min(56vw, 190px); aspect-ratio: 1;
+    border-radius: 50%; object-fit: cover;
+    border: 4px solid #f5c518;
+    margin-bottom: 18px; z-index: 10;
+    animation: pulse-photo 2s infinite;
+  }
+  @keyframes pulse-photo {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  .btn-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 240px;
+    z-index: 10;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #f5c518, #ff9800);
+    color: #10172b; border: none;
+    padding: 14px 32px; font-size: 16px; font-weight: 900;
+    border-radius: 50px; cursor: pointer; z-index: 10;
+    font-family: inherit;
+    touch-action: manipulation;
+  }
+  .btn:active { transform: scale(0.95); }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 2px solid rgba(245, 197, 24, 0.5);
+  }
+
+  #fireworks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+  .firework-particle {
+    position: absolute;
+    top: 0; left: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="stat">
+      <div class="label">Очки</div>
+      <div class="val" id="score">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Линии</div>
+      <div class="val"><span id="lines">0</span>/8</div>
+    </div>
+    <div id="next-piece-mini"></div>
+    <button id="restart-btn" class="ctrl-btn" title="Начать снова">🔄</button>
+    <button id="pause-btn" class="ctrl-btn" title="Пауза">⏸️</button>
+    <button id="music-btn" class="ctrl-btn" title="Фоновая музыка">🎶</button>
+    <button id="mute-btn" class="ctrl-btn" title="Звуковые эффекты">🔊</button>
+  </header>
+
+  <div id="game-area">
+    <div id="board-wrapper">
+      <div id="board"></div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="btn-left"   class="ctrl">◀</button>
+    <button id="btn-rotate" class="ctrl">↻</button>
+    <button id="btn-right"  class="ctrl">▶</button>
+    <button id="btn-soft"   class="ctrl">▼</button>
+    <button id="btn-hard"   class="ctrl hard">⤓</button>
+  </div>
+
+  <div id="start-screen" class="overlay active">
+    <h3>Тетрис</h3>
+    <p>Собери 8 линий!<br>Управление: кнопки внизу, свайпы или клавиатура.</p>
+    <button class="btn" id="start-btn">Начать</button>
+  </div>
+
+  <div id="pause-overlay" class="overlay">
+    <h3>Пауза</h3>
+    <div class="btn-stack">
+      <button class="btn" id="resume-btn">Продолжить</button>
+      <button class="btn btn-secondary" id="pause-restart-btn">Начать снова</button>
+    </div>
+  </div>
+
+  <div id="gameover-screen" class="overlay">
+    <h3>Игра окончена 💔</h3>
+    <p>Поле заполнено. Не сдавайся — попробуй ещё раз!</p>
+    <button class="btn" id="retry-btn">Попробовать снова</button>
+  </div>
+
+  <div id="win-screen" class="overlay">
+    <div id="fireworks"></div>
+    <h3>Собраны все линии! 🎉</h3>
+    <img class="win-photo" src="../photos/photo11.jpg" alt="13 лет" onerror="this.style.display='none'">
+    <p>Ты справилась! Молодец! В 12 лет ты уже умела добиваться цели. Пусть всё в твоей жизни складывается так же идеально и красиво! 💫</p>
+    <div class="btn-stack">
+      <button class="btn" id="next-quest-btn">Дальше</button>
+      <button class="btn btn-secondary" id="play-again-btn">Играть ещё</button>
+    </div>
+  </div>
+
+<script>
+  const COLS = 8;
+  const ROWS = 16;
+  const TARGET_LINES = 8;
+  const DROP_INTERVAL = 900;
+
+  const PIECES = {
+    I: { shape: [[1,1,1,1]],         color: '#00e5ff' },
+    O: { shape: [[1,1],[1,1]],       color: '#f5c518' },
+    T: { shape: [[0,1,0],[1,1,1]],   color: '#a855f7' },
+    S: { shape: [[0,1,1],[1,1,0]],   color: '#22c55e' },
+    Z: { shape: [[1,1,0],[0,1,1]],   color: '#ff4a6a' },
+    J: { shape: [[1,0,0],[1,1,1]],   color: '#4a9eff' },
+    L: { shape: [[0,0,1],[1,1,1]],   color: '#ff9800' }
+  };
+
+  // === ФОНОВАЯ МУЗЫКА ===
+  const bgMusic = new Audio('../music/Popcorn.mp3');
+  bgMusic.loop = true;
+  bgMusic.volume = 0.35;
+  bgMusic.preload = 'auto';
+  let isMusicMuted = false;
+
+  function ensureBgMusicPlaying() {
+    if (isMusicMuted) return;
+    if (bgMusic.paused) {
+      bgMusic.play().catch(() => {});
+    }
+  }
+
+  // === ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/) ===
+  const SOUND_FILES = {
+    move:     '../sounds/click.mp3',
+    land:     '../sounds/click3.mp3',
+    clear1:   '../sounds/win3.mp3',
+    clear2:   '../sounds/win4.mp3',
+    tetris:   '../sounds/win1.mp3',
+    error:    '../sounds/krestik2.mp3',
+    gameover: '../sounds/ygreck.mp3',
+    win:      '../sounds/clickend.mp3'
+  };
+
+  const SOUND_VOLUMES = {
+    move: 0.3,
+    land: 0.4,
+    clear1: 0.25,
+    clear2: 0.5,
+    tetris: 0.7,
+    error: 0.2,
+    gameover: 0.7,
+    win: 0.8
+  };
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = AudioCtx ? new AudioCtx() : null;
+  const soundBuffers = {};
+  const htmlAudioPool = {};
+  const isLocalFile = window.location.protocol === 'file:';
+  let isAudioUnlocked = false;
+  let isMuted = false;
+
+  Object.keys(SOUND_FILES).forEach(key => {
+    const a = new Audio(SOUND_FILES[key]);
+    a.preload = 'auto';
+    htmlAudioPool[key] = a;
+  });
+
+  async function loadSoundBuffer(key, url) {
+    if (!audioCtx || isLocalFile) return;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const buf = await resp.arrayBuffer();
+      soundBuffers[key] = await audioCtx.decodeAudioData(buf);
+    } catch (e) {
+      soundBuffers[key] = null;
+    }
+  }
+  Object.keys(SOUND_FILES).forEach(k => loadSoundBuffer(k, SOUND_FILES[k]));
+
+  function unlockAudio() {
+    ensureBgMusicPlaying();
+    if (isAudioUnlocked) return;
+    isAudioUnlocked = true;
+    if (audioCtx) {
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      try {
+        const b = audioCtx.createBuffer(1, 1, 22050);
+        const s = audioCtx.createBufferSource();
+        s.buffer = b;
+        s.connect(audioCtx.destination);
+        s.start(0);
+      } catch (e) {}
+    }
+  }
+
+  function playHtmlAudio(key, vol) {
+    const a = htmlAudioPool[key];
+    if (!a) return;
+    try {
+      a.pause();
+      a.currentTime = 0;
+      a.volume = vol;
+      a.muted = isMuted;
+      a.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  function playSound(key) {
+    if (isMuted) return;
+    const vol = SOUND_VOLUMES[key] || 0.5;
+    const buffer = soundBuffers[key];
+    if (audioCtx && buffer && !isLocalFile) {
+      const run = () => {
+        try {
+          const src = audioCtx.createBufferSource();
+          const gain = audioCtx.createGain();
+          gain.gain.value = vol;
+          src.buffer = buffer;
+          src.connect(gain);
+          gain.connect(audioCtx.destination);
+          src.start(audioCtx.currentTime + 0.005);
+        } catch (e) {
+          playHtmlAudio(key, vol);
+        }
+      };
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(run).catch(() => playHtmlAudio(key, vol));
+      } else {
+        run();
+      }
+    } else {
+      playHtmlAudio(key, vol);
+    }
+  }
+
+  function playClearSound(count) {
+    if (count >= 4) playSound('tetris');
+    else if (count >= 2) playSound('clear2');
+    else playSound('clear1');
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(count >= 4 ? [50, 30, 50, 30, 100] : 30);
+      } catch (e) {}
+    }
+  }
+
+  // === СОСТОЯНИЕ ИГРЫ ===
+  let board = [];
+  let cells = [];
+  let miniCells = [];
+  let currentPiece = null;
+  let nextPiece = null;
+  let bag = [];
+  let score = 0;
+  let lines = 0;
+  let isGameOver = false;
+  let isPaused = false;
+  let isLocking = false;
+  let sessionId = 0;
+  let gameRAF = null;
+  let lastTime = 0;
+  let dropCounter = 0;
+
+  const boardEl = document.getElementById('board');
+  const boardWrapper = document.getElementById('board-wrapper');
+  const gameArea = document.getElementById('game-area');
+  const scoreEl = document.getElementById('score');
+  const linesEl = document.getElementById('lines');
+  const nextMiniEl = document.getElementById('next-piece-mini');
+  const restartBtn = document.getElementById('restart-btn');
+  const pauseBtn = document.getElementById('pause-btn');
+  const musicBtn = document.getElementById('music-btn');
+  const muteBtn = document.getElementById('mute-btn');
+
+  function resizeBoard() {
+    const maxH = gameArea.clientHeight - 4;
+    const maxW = gameArea.clientWidth - 4;
+    let h = maxH;
+    let w = h / 2;
+    if (w > maxW) { w = maxW; h = w * 2; }
+    boardWrapper.style.width = Math.floor(w) + 'px';
+    boardWrapper.style.height = Math.floor(h) + 'px';
+  }
+  window.addEventListener('resize', resizeBoard);
+
+  function buildGrid() {
+    if (cells.length === 0) {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        const row = [];
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          boardEl.appendChild(cell);
+          row.push(cell);
+        }
+        cells.push(row);
+      }
+    }
+    if (miniCells.length === 0) {
+      nextMiniEl.innerHTML = '';
+      for (let i = 0; i < 16; i++) {
+        const d = document.createElement('div');
+        nextMiniEl.appendChild(d);
+        miniCells.push(d);
+      }
+    }
+  }
+
+  function getNextType() {
+    if (bag.length === 0) {
+      bag = Object.keys(PIECES);
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+    }
+    return bag.pop();
+  }
+
+  function createPiece(type) {
+    const def = PIECES[type];
+    return {
+      shape: def.shape.map(r => [...r]),
+      color: def.color,
+      x: 0,
+      y: 0
+    };
+  }
+
+  function collides(shape, x, y) {
+    for (let r = 0; r < shape.length; r++) {
+      for (let c = 0; c < shape[r].length; c++) {
+        if (!shape[r][c]) continue;
+        const nx = x + c;
+        const ny = y + r;
+        if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+        if (ny >= 0 && board[ny][nx] !== 0) return true;
+      }
+    }
+    return false;
+  }
+
+  function spawnPiece() {
+    if (!nextPiece) nextPiece = createPiece(getNextType());
+    currentPiece = nextPiece;
+    nextPiece = createPiece(getNextType());
+    currentPiece.x = Math.floor((COLS - currentPiece.shape[0].length) / 2);
+    currentPiece.y = 0;
+    renderNextPiece();
+
+    if (collides(currentPiece.shape, currentPiece.x, currentPiece.y)) {
+      isGameOver = true;
+      currentPiece = null;
+      renderBoard();
+      playSound('gameover');
+      if (navigator.vibrate) {
+        try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+      }
+      const curSession = sessionId;
+      setTimeout(() => {
+        if (curSession === sessionId) {
+          document.getElementById('gameover-screen').classList.add('active');
+        }
+      }, 400);
+      return;
+    }
+    renderBoard();
+  }
+
+  function moveLeft() {
+    if (!currentPiece || isPaused || isGameOver || isLocking) return;
+    if (!collides(currentPiece.shape, currentPiece.x - 1, currentPiece.y)) {
+      currentPiece.x--;
+      playSound('move');
+      renderBoard();
+    }
+  }
+
+  function moveRight() {
+    if (!currentPiece || isPaused || isGameOver || isLocking) return;
+    if (!collides(currentPiece.shape, currentPiece.x + 1, currentPiece.y)) {
+      currentPiece.x++;
+      playSound('move');
+      renderBoard();
+    }
+  }
+
+  function moveDown() {
+    if (!currentPiece || isPaused || isGameOver || isLocking) return;
+    if (!collides(currentPiece.shape, currentPiece.x, currentPiece.y + 1)) {
+      currentPiece.y++;
+      renderBoard();
+    } else {
+      lockPiece();
+    }
+  }
+
+  function softDrop() {
+    if (!currentPiece || isPaused || isGameOver || isLocking) return;
+    if (!collides(currentPiece.shape, currentPiece.x, currentPiece.y + 1)) {
+      currentPiece.y++;
+      dropCounter = 0;
+      playSound('move');
+      renderBoard();
+    } else {
+      lockPiece();
+    }
+  }
+
+  function hardDrop() {
+    if (!currentPiece || isPaused || isGameOver || isLocking) return;
+    while (!collides(currentPiece.shape, currentPiece.x, currentPiece.y + 1)) {
+      currentPiece.y++;
+    }
+    playSound('land');
+    if (navigator.vibrate) {
+      try { navigator.vibrate(20); } catch (e) {}
+    }
+    lockPiece();
+  }
+
+  function rotate() {
+    if (!currentPiece || isPaused || isGameOver || isLocking) return;
+    const rotated = currentPiece.shape[0].map((_, i) =>
+      currentPiece.shape.map(row => row[i]).reverse()
+    );
+    const kicks = [0, -1, 1, -2, 2];
+    for (const k of kicks) {
+      if (!collides(rotated, currentPiece.x + k, currentPiece.y)) {
+        currentPiece.shape = rotated;
+        currentPiece.x += k;
+        playSound('move');
+        renderBoard();
+        return;
+      }
+    }
+    playSound('error');
+  }
+
+  function lockPiece() {
+    if (!currentPiece || isLocking) return;
+    isLocking = true;
+
+    for (let r = 0; r < currentPiece.shape.length; r++) {
+      for (let c = 0; c < currentPiece.shape[r].length; c++) {
+        if (!currentPiece.shape[r][c]) continue;
+        const ny = currentPiece.y + r;
+        const nx = currentPiece.x + c;
+        if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
+          board[ny][nx] = currentPiece.color;
+        }
+      }
+    }
+
+    currentPiece = null;
+
+    // Находим полностью заполненные ряды
+    const fullRows = [];
+    for (let r = 0; r < ROWS; r++) {
+      let rowFull = true;
+      for (let c = 0; c < COLS; c++) {
+        if (!board[r][c]) {
+          rowFull = false;
+          break;
+        }
+      }
+      if (rowFull) fullRows.push(r);
+    }
+
+    renderBoard();
+
+    const points = [0, 100, 300, 500, 800];
+    const cleared = fullRows.length;
+
+    if (cleared > 0) {
+      for (let i = 0; i < fullRows.length; i++) {
+        const r = fullRows[i];
+        for (let c = 0; c < COLS; c++) {
+          cells[r][c].classList.add('clearing');
+        }
+      }
+      playClearSound(cleared);
+      score += points[Math.min(cleared, 4)];
+      lines += cleared;
+      updateHUD();
+
+      const curSession = sessionId;
+      setTimeout(() => {
+        if (curSession !== sessionId) return;
+
+        // Удаляем заполненные ряды и добавляем пустые сверху
+        const newBoard = [];
+        for (let i = 0; i < cleared; i++) {
+          newBoard.push(Array(COLS).fill(0));
+        }
+        for (let r = 0; r < ROWS; r++) {
+          if (!fullRows.includes(r)) {
+            newBoard.push(board[r]);
+          }
+        }
+        board = newBoard;
+
+        if (lines >= TARGET_LINES) {
+          isLocking = false;
+          renderBoard();
+          triggerVictory();
+          return;
+        }
+        isLocking = false;
+        spawnPiece();
+      }, 360);
+    } else {
+      isLocking = false;
+      spawnPiece();
+    }
+  }
+
+  function renderBoard() {
+    // Полный чистый сброс всех 128 клеток поля перед отрисовкой
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = cells[r][c];
+        const blockColor = board[r][c];
+        cell.className = 'cell';
+        if (blockColor) {
+          cell.style.background = blockColor;
+          cell.classList.add('filled');
+          cell.style.boxShadow = `inset 0 0 0 1px rgba(255,255,255,0.28), inset 0 -2px 3px rgba(0,0,0,0.45), 0 0 7px ${blockColor}77`;
+        } else {
+          cell.style.background = '';
+          cell.style.boxShadow = '';
+        }
+      }
+    }
+
+    if (currentPiece) {
+      const ghostY = getGhostY();
+      if (ghostY !== currentPiece.y) {
+        drawShape(currentPiece.shape, currentPiece.x, ghostY, currentPiece.color, true);
+      }
+      drawShape(currentPiece.shape, currentPiece.x, currentPiece.y, currentPiece.color, false);
+    }
+  }
+
+  function drawShape(shape, x, y, color, isGhost) {
+    for (let r = 0; r < shape.length; r++) {
+      for (let c = 0; c < shape[r].length; c++) {
+        if (!shape[r][c]) continue;
+        const ny = y + r;
+        const nx = x + c;
+        if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+        const cell = cells[ny][nx];
+
+        if (isGhost) {
+          // Сплошной тонкий бледно-голубой контур без пунктира
+          cell.className = 'cell ghost';
+          cell.style.background = '';
+          cell.style.boxShadow = '';
+        } else {
+          cell.className = 'cell filled active-piece';
+          cell.style.background = color;
+          cell.style.boxShadow = `inset 0 0 0 2px rgba(255,255,255,0.55), 0 0 12px ${color}, 0 0 22px ${color}bb`;
+        }
+      }
+    }
+  }
+
+  function getGhostY() {
+    if (!currentPiece) return 0;
+    let y = currentPiece.y;
+    while (!collides(currentPiece.shape, currentPiece.x, y + 1)) y++;
+    return y;
+  }
+
+  function renderNextPiece() {
+    for (let i = 0; i < 16; i++) {
+      miniCells[i].style.background = 'transparent';
+      miniCells[i].style.boxShadow = 'none';
+      miniCells[i].style.border = 'none';
+    }
+    if (!nextPiece) return;
+    const shape = nextPiece.shape;
+    const h = shape.length;
+    const w = shape[0].length;
+    const offX = Math.floor((4 - w) / 2);
+    const offY = Math.floor((4 - h) / 2);
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        if (!shape[r][c]) continue;
+        const idx = (offY + r) * 4 + (offX + c);
+        const cell = miniCells[idx];
+        if (cell) {
+          cell.style.background = nextPiece.color;
+          cell.style.borderTop = '1px solid rgba(255,255,255,0.5)';
+          cell.style.borderBottom = '1px solid rgba(0,0,0,0.4)';
+          cell.style.boxShadow = `0 0 6px ${nextPiece.color}`;
+        }
+      }
+    }
+  }
+
+  function updateHUD() {
+    scoreEl.textContent = score;
+    linesEl.textContent = lines;
+  }
+
+  function gameLoop(timestamp) {
+    if (isGameOver) return;
+    if (!lastTime) lastTime = timestamp;
+    const delta = Math.min(timestamp - lastTime, 100);
+    lastTime = timestamp;
+
+    if (!isPaused && !isLocking && currentPiece) {
+      dropCounter += delta;
+      if (dropCounter >= DROP_INTERVAL) {
+        dropCounter = 0;
+        moveDown();
+      }
+    }
+    gameRAF = requestAnimationFrame(gameLoop);
+  }
+
+  function togglePause() {
+    if (isGameOver) return;
+    isPaused = !isPaused;
+    const pauseOverlay = document.getElementById('pause-overlay');
+    if (isPaused) {
+      pauseBtn.textContent = '▶️';
+      pauseOverlay.classList.add('active');
+    } else {
+      pauseBtn.textContent = '⏸️';
+      pauseOverlay.classList.remove('active');
+      lastTime = 0;
+      dropCounter = 0;
+    }
+  }
+
+  function toggleMusic() {
+    isMusicMuted = !isMusicMuted;
+    bgMusic.muted = isMusicMuted;
+    musicBtn.textContent = isMusicMuted ? '🎵' : '🎶';
+    musicBtn.classList.toggle('muted', isMusicMuted);
+    if (!isMusicMuted) {
+      ensureBgMusicPlaying();
+    }
+  }
+
+  function toggleMute() {
+    unlockAudio();
+    isMuted = !isMuted;
+    muteBtn.textContent = isMuted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('muted', isMuted);
+    Object.values(htmlAudioPool).forEach(s => { s.muted = isMuted; });
+  }
+
+  restartBtn.addEventListener('click', () => {
+    unlockAudio();
+    initGame();
+  });
+  pauseBtn.addEventListener('click', togglePause);
+  musicBtn.addEventListener('click', toggleMusic);
+  muteBtn.addEventListener('click', toggleMute);
+
+  function bindHold(id, action, delay = 180, interval = 75) {
+    const btn = document.getElementById(id);
+    let holdT = null, repT = null;
+    const start = (e) => {
+      e.preventDefault();
+      unlockAudio();
+      stop();
+      action();
+      holdT = setTimeout(() => {
+        repT = setInterval(action, interval);
+      }, delay);
+    };
+    const stop = () => {
+      if (holdT) { clearTimeout(holdT); holdT = null; }
+      if (repT) { clearInterval(repT); repT = null; }
+    };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointercancel', stop);
+    btn.addEventListener('pointerleave', stop);
+  }
+  bindHold('btn-left',  moveLeft);
+  bindHold('btn-right', moveRight);
+  bindHold('btn-soft',  softDrop);
+  document.getElementById('btn-rotate').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); rotate(); });
+  document.getElementById('btn-hard').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); hardDrop(); });
+
+  let swX = 0, swY = 0, swActive = false;
+  boardWrapper.addEventListener('pointerdown', e => {
+    unlockAudio();
+    swX = e.clientX;
+    swY = e.clientY;
+    swActive = true;
+  });
+  boardWrapper.addEventListener('pointerup', e => {
+    if (!swActive) return;
+    swActive = false;
+    const dx = e.clientX - swX;
+    const dy = e.clientY - swY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 18) rotate();
+    else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+      if (dx > 0) moveRight(); else moveLeft();
+    } else if (dy > 50 && Math.abs(dy) > Math.abs(dx)) {
+      hardDrop();
+    }
+  });
+  boardWrapper.addEventListener('pointercancel', () => { swActive = false; });
+
+  document.addEventListener('keydown', e => {
+    if (isGameOver) return;
+    if (e.key === 'p' || e.key === 'P') { togglePause(); e.preventDefault(); return; }
+    if (isPaused || isLocking) return;
+    switch (e.key) {
+      case 'ArrowLeft':  moveLeft();  e.preventDefault(); break;
+      case 'ArrowRight': moveRight(); e.preventDefault(); break;
+      case 'ArrowDown':  softDrop();  e.preventDefault(); break;
+      case 'ArrowUp':
+      case 'w': case 'W': rotate();   e.preventDefault(); break;
+      case ' ':          hardDrop();  e.preventDefault(); break;
+    }
+  });
+
+  // === ПУЛ ЧАСТИЦ САЛЮТА ===
+  const FW_POOL_SIZE = 80;
+  const fwPool = [];
+  let fwRAF = null;
+
+  function initFireworksPool() {
+    const container = document.getElementById('fireworks');
+    container.innerHTML = '';
+    fwPool.length = 0;
+    for (let i = 0; i < FW_POOL_SIZE; i++) {
+      const el = document.createElement('div');
+      el.className = 'firework-particle';
+      container.appendChild(el);
+      fwPool.push({ el, active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, decay: 1 });
+    }
+  }
+
+  function stopFireworks() {
+    if (fwRAF) { cancelAnimationFrame(fwRAF); fwRAF = null; }
+    for (let i = 0; i < fwPool.length; i++) {
+      fwPool[i].active = false;
+      fwPool[i].el.style.opacity = '0';
+    }
+  }
+
+  function launchFireworks() {
+    stopFireworks();
+    const colors = ['#f5c518', '#ff4a6a', '#4a9eff', '#ff9800', '#aaffb0', '#ff99cc', '#ffffff'];
+    const curSession = sessionId;
+    let lastFwTime = performance.now();
+
+    function spawnBurst() {
+      if (curSession !== sessionId) return;
+      const bx = window.innerWidth * (0.15 + Math.random() * 0.7);
+      const by = window.innerHeight * (0.15 + Math.random() * 0.6);
+      const count = 12;
+      let spawned = 0;
+      for (let i = 0; i < fwPool.length && spawned < count; i++) {
+        const p = fwPool[i];
+        if (p.active) continue;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const angle = (Math.PI * 2 * spawned) / count + (Math.random() - 0.5) * 0.4;
+        const speed = 70 + Math.random() * 140;
+        const size = 4 + Math.random() * 5;
+        p.active = true;
+        p.x = bx;
+        p.y = by;
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed;
+        p.life = 1;
+        p.decay = 0.8 + Math.random() * 0.5;
+        p.el.style.width = size + 'px';
+        p.el.style.height = size + 'px';
+        p.el.style.background = color;
+        spawned++;
+      }
+    }
+
+    for (let b = 0; b < 10; b++) {
+      setTimeout(spawnBurst, b * 260);
+    }
+
+    function stepFireworks(now) {
+      if (curSession !== sessionId) return;
+      const dt = Math.min((now - lastFwTime) / 1000, 0.05);
+      lastFwTime = now;
+      for (let i = 0; i < fwPool.length; i++) {
+        const p = fwPool[i];
+        if (!p.active) continue;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 120 * dt;
+        p.life -= p.decay * dt;
+        if (p.life <= 0) {
+          p.active = false;
+          p.el.style.opacity = '0';
+        } else {
+          p.el.style.opacity = String(p.life);
+          p.el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0) scale(${0.3 + p.life * 0.7})`;
+        }
+      }
+      fwRAF = requestAnimationFrame(stepFireworks);
+    }
+    fwRAF = requestAnimationFrame(stepFireworks);
+  }
+
+  function initGame() {
+    sessionId++;
+    if (gameRAF) cancelAnimationFrame(gameRAF);
+    stopFireworks();
+
+    document.getElementById('start-screen').classList.remove('active');
+    document.getElementById('win-screen').classList.remove('active');
+    document.getElementById('gameover-screen').classList.remove('active');
+    document.getElementById('pause-overlay').classList.remove('active');
+
+    isGameOver = false;
+    isPaused = false;
+    isLocking = false;
+    pauseBtn.textContent = '⏸️';
+    score = 0;
+    lines = 0;
+    currentPiece = null;
+    nextPiece = null;
+    bag = [];
+    dropCounter = 0;
+    lastTime = 0;
+
+    board = [];
+    for (let r = 0; r < ROWS; r++) board.push(Array(COLS).fill(0));
+
+    buildGrid();
+    resizeBoard();
+    updateHUD();
+    spawnPiece();
+    gameRAF = requestAnimationFrame(gameLoop);
+  }
+
+  function triggerVictory() {
+    if (isGameOver) return;
+    isGameOver = true;
+    if (gameRAF) cancelAnimationFrame(gameRAF);
+    playSound('win');
+    if (navigator.vibrate) {
+      try { navigator.vibrate([100, 50, 100, 50, 200]); } catch (e) {}
+    }
+    const curSession = sessionId;
+    setTimeout(() => {
+      if (curSession !== sessionId) return;
+      document.getElementById('win-screen').classList.add('active');
+      launchFireworks();
+    }, 300);
+  }
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    unlockAudio();
+    initGame();
+  });
+  document.getElementById('resume-btn').addEventListener('click', togglePause);
+  document.getElementById('pause-restart-btn').addEventListener('click', () => {
+    unlockAudio();
+    initGame();
+  });
+  document.getElementById('retry-btn').addEventListener('click', () => {
+    unlockAudio();
+    initGame();
+  });
+  document.getElementById('play-again-btn').addEventListener('click', () => {
+    unlockAudio();
+    initGame();
+  });
+  document.getElementById('next-quest-btn').addEventListener('click', () => {
+    sessionId++;
+    stopFireworks();
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
+    }
+  });
+
+  window.addEventListener('orientationchange', () => setTimeout(resizeBoard, 200));
+
+  buildGrid();
+  initFireworksPool();
+  resizeBoard();
+</script>
+</body>
+</html>
