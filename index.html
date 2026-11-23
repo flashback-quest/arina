@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Подарок Арине</title>
+
+<!-- Подключение фавикона (иконки сайта) -->
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* =========================================================================
+   БАЗОВЫЕ ПЕРЕМЕННЫЕ И СБРОС
+   ========================================================================= */
+:root {
+  --gold: #f5c518;
+  --noble-gold: #ffeaa7;
+  --bg-1: #0a0f1e;
+  --bg-2: #16213e;
+  --card: #1c2745;
+  --text-main: #f0edff;
+  --accent: #a29bfe;
+  --shadow-deep: 0 10px 30px rgba(0,0,0,0.5);
+  --neon-pink: #ff0080;
+  --toxic-pink: #ff0080;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  width: 100%; height: 100%; height: 100dvh;
+  overflow: hidden;
+  font-family: 'Nunito', sans-serif;
+  background: radial-gradient(circle at 50% 30%, #1e2a4a 0%, var(--bg-1) 70%, #05070f 100%);
+  color: var(--text-main);
+  display: flex; flex-direction: column;
+}
+
+/* =========================================================================
+   ФОНОВЫЕ ЭФФЕКТЫ (ЗВЕЗДЫ И КОМЕТЫ)
+   ========================================================================= */
+.space-bg {
+  position: fixed; 
+  inset: 0; 
+  z-index: 1; 
+  pointer-events: none; 
+  overflow: hidden;
+}
+.space-bg.paused {
+  display: none;
+}
+.space-bg.paused *,
+.space-bg.paused *::before,
+.space-bg.paused *::after {
+  animation-play-state: paused !important;
+}
+
+/* --- ЗВЕЗДЫ (ОРБИТЫ) --- */
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--radius) * 2);
+  height: calc(var(--radius) * 2);
+  margin-top: calc(var(--radius) * -1);
+  margin-left: calc(var(--radius) * -1);
+  animation: rotateOrbit var(--orbit-speed) linear infinite;
+  animation-delay: var(--orbit-delay);
+}
+
+.star {
+  position: absolute;
+  top: 0; 
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--star-size);
+  height: var(--star-size);
+  animation: 
+    spinStar var(--spin-speed) linear infinite,
+    pulseStar var(--pulse-speed) ease-in-out infinite alternate;
+  animation-delay: var(--spin-delay), var(--pulse-delay);
+  transition: background 1.5s ease, box-shadow 1.5s ease;
+}
+
+.star::after {
+  content: '';
+  position: absolute;
+  inset: -70%; 
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--star-glow) 0%, transparent 60%);
+  opacity: 0.6;
+  z-index: -1;
+  filter: blur(3px); 
+  transition: background 1.5s ease;
+}
+
+.star::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--star-color);
+  z-index: 1;
+  transition: background 1.5s ease, clip-path 1s ease;
+}
+
+.star.classic::before {
+  clip-path: polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0% 50%, 42% 42%);
+}
+
+.star.long::before {
+  clip-path: polygon(50% 0%, 55% 45%, 100% 50%, 55% 55%, 50% 100%, 45% 55%, 0% 50%, 45% 45%);
+}
+
+.star.stretch::before {
+  clip-path: polygon(50% 0%, 53% 40%, 100% 50%, 53% 60%, 50% 100%, 47% 60%, 0% 50%, 47% 40%);
+}
+
+.color-white { --star-color: #ffffff; --star-glow: rgba(255,255,255,0.8); }
+.color-gold  { --star-color: #ffd700; --star-glow: rgba(255,215,0,0.8); }
+.color-blue  { --star-color: #87ceeb; --star-glow: rgba(135,206,235,0.8); }
+.color-pink  { --star-color: #ff9cb0; --star-glow: rgba(255,156,176,0.8); }
+
+@keyframes rotateOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinStar {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to { transform: translateX(-50%) rotate(360deg); }
+}
+
+@keyframes pulseStar {
+  0% { opacity: 0.3; scale: 0.6; }
+  100% { opacity: 1; scale: 1.5; }
+}
+
+/* --- КОМЕТЫ --- */
+.comet-wrapper {
+  position: absolute;
+  width: 0; height: 0;
+  top: 0; left: 0;
+  opacity: 0;
+  animation: flyComet var(--fly-duration) linear forwards;
+}
+
+.comet-inner {
+  position: absolute;
+  top: 0; left: 0;
+  transform: rotate(var(--angle));
+  transform-origin: 0 0;
+}
+
+.comet-head {
+  position: absolute;
+  width: 6px; height: 6px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #fff, 0 0 20px #87ceeb;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.comet-tail {
+  position: absolute;
+  top: 50%; right: 100%; 
+  width: 120px; height: 2px;
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.9), transparent);
+  transform: translateY(-50%);
+  z-index: 1;
+  filter: blur(1.5px);
+}
+
+@keyframes flyComet {
+  0% { opacity: 1; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Кнопка звука */
+.mute-btn {
+  position: fixed; top: 12px; left: 12px; z-index: 100;
+  background: rgba(16, 23, 46, 0.85); border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; font-size: 14px; width: 30px; height: 30px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.3s;
+  opacity: 0.75;
+}
+
+.mute-btn:active { transform: scale(0.9); opacity: 1; }
+
+/* =========================================================================
+   КОНТЕЙНЕР
+   ========================================================================= */
+#quest-container {
+  position: relative; z-index: 2;
+  width: 100%; height: 100%; max-width: 500px;
+  margin: 0 auto;
+  display: flex; flex-direction: column;
+  padding: 10px 0; 
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.screen {
+  display: none;
+  width: 100%; height: 100%;
+  flex-direction: column;
+  opacity: 0; transition: opacity 0.4s ease;
+  justify-content: center;
+  overflow: visible; 
+}
+.screen.active { display: flex; opacity: 1; }
+
+/* =========================================================================
+   ПЛОТНАЯ СЕТКА
+   ========================================================================= */
+.header-zone {
+  text-align: center;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+  padding: 0 10px;
+}
+
+.content-zone {
+  display: flex; flex-direction: column;
+  align-items: center; 
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 15px;
+  overflow: visible; 
+}
+
+.footer-zone {
+  width: 100%; 
+  margin-top: 10px;
+  display: flex; gap: 10px;
+  position: relative;
+  flex-shrink: 0;
+  padding: 0 15px;
+}
+
+/* =========================================================================
+   ТИПОГРАФИКА
+   ========================================================================= */
+h1 {
+  font-family: 'Caveat', cursive; font-size: 2rem; font-weight: 700;
+  color: var(--noble-gold); line-height: 1.1;
+  text-shadow: 0 0 10px rgba(255,234,167,0.4);
+}
+.subtitle {
+  font-size: 0.8rem; color: var(--accent);
+  letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700;
+}
+
+/* =========================================================================
+   ЭКРАН ОБЛОЖКИ
+   ========================================================================= */
+.only-for-you-wrapper {
+  position: relative; display: inline-block;
+  transform: rotate(-2deg);
+}
+.underline-svg {
+  position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
+  overflow: visible; pointer-events: none;
+}
+.underline-svg path {
+  fill: none; stroke: var(--neon-pink); stroke-width: 3; stroke-linecap: round;
+  filter: drop-shadow(0 0 8px rgba(255, 0, 128, 0.9));
+}
+
+.recipient-info {
+  text-align: left;
+  margin-bottom: 20px;
+  font-family: 'Nunito', sans-serif;
+  display: flex; flex-direction: column; gap: 8px;
+  width: 100%; max-width: 250px;
+}
+.recipient-info .tag-line {
+  font-size: 0.9rem; color: #ddd; text-transform: uppercase; letter-spacing: 1px;
+  display: flex; align-items: baseline;
+}
+.recipient-info .tag-label { width: 80px; flex-shrink: 0; }
+.recipient-info .dots { color: #666; flex-grow: 1; overflow: hidden; white-space: nowrap; margin: 0 5px; letter-spacing: 2px; }
+.recipient-info .tag-name {
+  font-family: 'Caveat', cursive; font-size: 1.6rem; color: var(--gold); line-height: 1;
+  text-transform: none;
+}
+
+/* Коробка и свечение */
+.box-wrapper {
+  position: relative;
+  width: 100%; 
+  max-width: 280px;
+  cursor: pointer;
+  animation: floatBox 3s ease-in-out infinite;
+  margin-bottom: 30px;
+  z-index: 1;
+  overflow: visible;
+}
+@keyframes floatBox {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.box-image {
+  width: 100%; height: auto; display: block;
+  filter: drop-shadow(0 0 5px #fff) 
+          drop-shadow(0 0 15px var(--gold)) 
+          drop-shadow(0 0 35px var(--gold)) 
+          drop-shadow(0 0 60px #ffb300); 
+  transition: transform 0.2s, opacity 0.5s;
+}
+.box-wrapper:active .box-image { transform: scale(0.95); }
+
+.box-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, rgba(245, 190, 24, 0.1) 40%, transparent 70%);
+  z-index: -1;
+  animation: pulseGlow 2s infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes pulseGlow {
+  0% { opacity: 0.7; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Овальная рамка "Жми!" */
+.hint-wrapper {
+  position: absolute; 
+  bottom: -40px; 
+  left: 65%; 
+  transform: translateX(-50%) rotate(-12deg); 
+  width: 150px; height: 85px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  animation: periodicWobble 5s ease-in-out infinite;
+}
+@keyframes periodicWobble {
+  0% { transform: translateX(-50%) rotate(-12deg); }
+  5% { transform: translateX(-50%) rotate(-18deg); }
+  10% { transform: translateX(-50%) rotate(-6deg); }
+  15% { transform: translateX(-50%) rotate(-16deg); }
+  20% { transform: translateX(-50%) rotate(-8deg); }
+  25% { transform: translateX(-50%) rotate(-14deg); }
+  30% { transform: translateX(-50%) rotate(-12deg); }
+  30%, 100% { transform: translateX(-50%) rotate(-12deg); }
+}
+
+.hint-oval {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  overflow: visible;
+  z-index: 1;
+  filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));
+}
+
+.hint-oval path {
+  fill: none; 
+  stroke: var(--toxic-pink); 
+  stroke-width: 1.8; 
+  stroke-linecap: round; 
+  stroke-linejoin: round;
+}
+
+.click-hint-text {
+  position: relative; z-index: 2;
+  font-family: 'Caveat', cursive; 
+  font-size: 2rem; 
+  color: var(--gold); 
+  font-weight: 700;
+  text-shadow: 2px 4px 8px rgba(0,0,0,0.95);
+}
+
+/* =========================================================================
+   ЭКРАН ИГРЫ
+   ========================================================================= */
+#screen-game { background: rgba(10, 15, 30, 0.85); }
+#game-mount {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  overflow-y: auto;
+}
+
+/* =========================================================================
+   ЭКРАН ИСТОРИИ И СТАРТА
+   ========================================================================= */
+.story-content-wrapper {
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; max-width: 340px; 
+}
+
+.step-img-box {
+  width: 100%; 
+  max-width: 280px;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px; overflow: hidden; margin-bottom: 20px;
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 15px rgba(245,197,24,0.3);
+  background: var(--card); flex-shrink: 0;
+}
+.step-img-box img { width: 100%; height: 100%; object-fit: cover; }
+
+.story-text-content { font-size: 1.05rem; line-height: 1.4; color: #e2d9ff; text-align: center; margin-bottom: 8px; }
+.author-sign { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--gold); margin-top: 8px; text-align: center; }
+
+/* =========================================================================
+   КНОПКИ И СВАЙП
+   ========================================================================= */
+.btn {
+  flex: 1;
+  padding: 12px 12px; 
+  background: rgba(28, 39, 69, 0.8); border: 1px solid var(--gold);
+  border-radius: 10px; color: #fff; font-size: 0.95rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; text-align: center;
+  transition: transform 0.1s, background 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn:active { transform: scale(0.96); background: rgba(245,197,24,0.2); }
+.btn-primary {
+  background: linear-gradient(135deg, rgba(245,197,24,0.2), rgba(255,152,0,0.05));
+  flex: 2;
+}
+.btn-hidden { visibility: hidden; }
+
+.swipe-zone {
+  position: absolute; inset: 0;
+  z-index: -1;
+}
+
+/* =========================================================================
+   АЛЬБОМ
+   ========================================================================= */
+.album-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7, 5, 15, 0.97);
+  z-index: 200; display: none; justify-content: center; align-items: center;
+}
+
+.album-content { position: relative; width: 90%; max-width: 350px; text-align: center; }
+
+.polaroid-frame {
+  background: #fff; padding: 12px 12px 15px 12px; border-radius: 4px;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.6); margin-bottom: 20px;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.polaroid-img-box { 
+  width: 100%; 
+  aspect-ratio: 1 / 1; 
+  background: #fff;    
+  overflow: hidden; 
+  flex-shrink: 0;
+}
+.polaroid-img-box img { width: 100%; height: 100%; object-fit: cover; }
+
+.polaroid-caption {
+  font-family: 'Caveat', cursive; font-size: 1.3rem; color: #222;
+  position: relative; padding-top: 12px; text-align: center;
+  white-space: normal; line-height: 1.2;
+  display: flex; align-items: center; justify-content: center;
+  height: 60px;
+}
+.album-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px;}
+.nav-arrow { background: none; border: none; color: #fff; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 10px; }
+
+.close-album { 
+  position: absolute; 
+  top: -40px; 
+  right: 10px; 
+  background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; 
+}
+
+/* =========================================================================
+   ДЕМО-ИГРА
+   ========================================================================= */
+.demo-game-panel {
+  text-align: center; display: flex; flex-direction: column; gap: 15px;
+  width: 100%; max-width: 280px; margin: auto;
+}
+
+/* =========================================================================
+   ВОЛШЕБНОЕ ОФОРМЛЕНИЕ ФИНАЛА
+   ========================================================================= */
+.final-title-wrapper {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  overflow: visible;
+}
+.final-num {
+  font-family: 'Caveat', cursive; 
+  font-size: 3.5rem; 
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 5px;
+  background: linear-gradient(to bottom, #fff8d6, #f5c518, #c98b00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 15px rgba(245, 197, 24, 0.6));
+}
+.final-sub {
+  font-family: 'Caveat', cursive;
+  font-size: 1.6rem;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.magic-sparkle {
+  position: absolute;
+  background: radial-gradient(circle, #fff 10%, #f5c518 50%, transparent 80%);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+@keyframes sparkleFly {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; }
+  30% { opacity: 1; transform: translate(var(--dx), var(--dy)) scale(1); }
+  70% { opacity: 1; transform: translate(calc(var(--dx) * 2), calc(var(--dy) * 2)) scale(1.1); }
+  100% { transform: translate(calc(var(--dx) * 3), calc(var(--dy) * 3)) scale(0); opacity: 0; }
+}
+/* Компактные отступы только для экрана мини-игр, чтобы кнопки не упирались в края */
+#screen-game .header-zone {
+  padding-top: 8px;
+  padding-bottom: 4px;
+  min-height: auto;
+}
+#screen-game #game-task-name {
+  font-size: 1.45rem !important;
+  margin-bottom: 2px;
+}
+#screen-game .content-zone {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+#screen-game .footer-zone {
+  padding-top: 4px;
+  padding-bottom: 8px;
+  min-height: 20px;
+}
+/* =========================================================================
+   ИГРОВАЯ КОМНАТА И ЭКРАН ВЫХОДА
+   ========================================================================= */
+.arcade-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.arcade-btn {
+  background: rgba(28, 39, 69, 0.85);
+  border: 1px solid rgba(245, 197, 24, 0.5);
+  border-radius: 12px;
+  padding: 10px 8px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: transform 0.15s, border-color 0.2s, background 0.2s;
+}
+
+.arcade-btn:active {
+  transform: scale(0.95);
+  background: rgba(245, 197, 24, 0.2);
+  border-color: var(--gold);
+}
+
+.arcade-btn-num {
+  font-size: 0.75rem;
+  color: var(--gold);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.arcade-btn-title {
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+/* Делаем 13-ю (нечётную) кнопку на всю ширину */
+.arcade-btn:last-child:nth-child(odd) {
+  grid-column: span 2;
+}
+</style>
+</head>
+
+<body>
+<div class="space-bg" id="space-bg"></div>
+
+<audio id="bg-music" src="music/birthday.mp3" loop></audio>
+<button id="mute-btn" class="mute-btn" title="Звук">🔊</button>
+
+<div id="quest-container">
+
+  <!-- ЭКРАН 0: ОБЛОЖКА -->
+  <div id="screen-cover" class="screen active">
+    <div class="header-zone" style="margin-top: 10px;">
+      <div class="only-for-you-wrapper">
+        <p class="subtitle" style="font-size: 1.2rem; letter-spacing: 2px; font-family:'Caveat', cursive; margin-bottom: 15px;">ONLY FOR YOU</p>
+        <svg class="underline-svg" viewBox="0 0 100 20" preserveAspectRatio="none">
+          <path d="M 5 15 Q 30 5 90 10" />
+        </svg>
+      </div>
+    </div>
+    
+    <div class="content-zone">
+      <div class="recipient-info">
+        <div class="tag-line">
+          <span class="tag-label">ОТ КОГО:</span>
+          <span class="dots">................................................</span>
+          <span class="tag-name">Папы</span>
+        </div>
+        <div class="tag-line">
+          <span class="tag-label">КОМУ:</span>
+          <span class="dots">................................................</span>
+          <span class="tag-name">Арине</span>
+        </div>
+      </div>
+
+      <div class="box-wrapper" id="gift-box">
+        <img class="box-image" src="photos/regalo.png" alt="Подарок" id="gift-img">
+        
+        <div class="hint-wrapper">
+          <svg class="hint-oval" viewBox="0 0 100 50">
+            <path d="M 15 25 C 10 10, 80 10, 85 25 C 90 40, 20 45, 15 30 C 10 20, 80 15, 80 25" />
+            <path d="M 20 28 C 25 45, 75 45, 80 30 C 85 15, 25 15, 20 28" />
+          </svg>
+          <span class="click-hint-text">Жми!</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer-zone" style="justify-content: center;">
+      <p style="color: var(--accent); font-size: 0.85rem; font-weight: bold; opacity: 0.8;">Made with LOVE by OTETS</p>
+    </div>
+  </div>
+
+  <!-- ЭКРАН СТАРТА -->
+  <div id="screen-start" class="screen">
+    <div class="header-zone">
+      <p class="subtitle">Секретный квест</p>
+      <h1>С Днём рождения!</h1>
+    </div>
+    <div class="content-zone">
+      <div class="story-content-wrapper">
+        <div class="step-img-box">
+          <img src="photos/photo1_1.jpg" alt="Арина">
+        </div>
+        <p class="story-text-content">
+          Доня, я знаю, как сильно ты любишь квесты!
+Поэтому я с огромной любовью создал этот секретный интерактивный квест-сайт лично для тебя.
+Нас ждет увлекательное путешествие по самым тёплым и весёлым воспоминаниям.
+Разгадай все тайны! Готова?.. Тогда — вперёд! ✨
+        </p>
+      </div>
+    </div>
+    <div class="footer-zone">
+      <button class="btn" id="btn-back-to-cover">‹ Назад</button>
+      <button class="btn btn-primary" id="btn-start">Начать квест</button>
+    </div>
+  </div>
+
+  <!-- ЭКРАН ИГРЫ -->
+  <div id="screen-game" class="screen">
+    <div class="header-zone">
+      <p id="game-step-label" class="subtitle" style="color:var(--gold);"></p>
+      <h1 id="game-task-name" style="font-size:1.8rem;"></h1>
+    </div>
+    <div class="content-zone">
+      <div id="game-mount"></div>
+    </div>
+    <div class="footer-zone">
+      <div class="swipe-zone" id="swipe-zone-game"></div>
+    </div>
+  </div>
+
+  <!-- ЭКРАН ИСТОРИИ -->
+  <div id="screen-story" class="screen">
+    <div class="header-zone">
+      <h1 id="story-title"></h1>
+    </div>
+    <div class="content-zone">
+      <div class="story-content-wrapper">
+        <div class="step-img-box">
+          <img id="story-img" src="" alt="Воспоминание">
+        </div>
+        <div class="story-text-container">
+          <p id="story-body-text" class="story-text-content"></p>
+          <p class="author-sign" id="story-author-sign"></p>
+        </div>
+      </div>
+    </div>
+    <div class="footer-zone" id="story-footer">
+      <button class="btn" id="btn-back">‹ Назад</button>
+      <button class="btn btn-primary" id="btn-story-next">Дальше</button>
+      <div class="swipe-zone" id="swipe-zone-story"></div>
+    </div>
+  </div>
+
+  <!-- ФИНАЛЬНЫЙ ЭКРАН -->
+  <div id="screen-final" class="screen">
+    <div class="header-zone final-title-wrapper" id="final-title-container">
+      <h1 class="final-num">14 лет</h1>
+      <h1 class="final-sub">С Днём рождения, Аришка!</h1>
+    </div>
+    <div class="content-zone">
+      <div class="story-content-wrapper">
+        <p class="story-text-content">Ты прошла весь квест! Воспоминаний намного больше, но вместить все в один квест слишком сложно - он получится просто огромным! Очень старался порадовать тебя. Надеюсь, что у меня это получилось.</p>
+        <p class="story-text-content" style="font-weight:700;color:#fff;">Будь смелой, вдохновлённой и самой счастливой!</p>
+        <p class="author-sign" style="font-size:1.6rem;margin-top:15px;">С любовью, папа</p>
+        <p class="author-sign" style="font-size:1.0rem;margin-top:12px;">28 ноября 2026 года</p>
+      </div>
+    </div>
+    <div class="footer-zone" style="flex-direction: column; gap: 8px;">
+      <div style="display: flex; gap: 8px; width: 100%;">
+        <button class="btn" id="btn-final-back">‹ Назад</button>
+        <button class="btn btn-primary" id="btn-album" style="flex: 2;">Фотки тут!</button>
+      </div>
+      <div style="display: flex; gap: 8px; width: 100%;">
+        <button class="btn" id="btn-arcade" style="border-color: var(--accent);">Игровая 🎮</button>
+        <button class="btn" id="btn-restart" style="border-color: rgba(255,255,255,0.25);">Ещё раз 🔄</button>
+      </div>
+      <button class="btn" id="btn-exit" style="width: 100%; border-color: rgba(255, 74, 106, 0.5); color: #ff9cb0;">Выйти 🚪</button>
+    </div>
+  </div>
+
+  <!-- ЭКРАН ИГРОВОЙ -->
+  <div id="screen-arcade" class="screen">
+    <div class="header-zone">
+      <p class="subtitle">Свободный режим</p>
+      <h1>Игровая</h1>
+    </div>
+    <div class="content-zone">
+      <div class="arcade-grid" id="arcade-grid"></div>
+    </div>
+    <div class="footer-zone">
+      <button class="btn btn-primary" id="btn-arcade-back">‹ Вернуться к поздравлению</button>
+    </div>
+  </div>
+
+  <!-- ЭКРАН ВЫХОДА (ЕСЛИ БРАУЗЕР БЛОКИРУЕТ ЗАКРЫТИЕ ВКЛАДКИ) -->
+  <div id="screen-goodbye" class="screen">
+    <div class="header-zone">
+      <h1>До встречи, Аришка! ✨</h1>
+    </div>
+    <div class="content-zone">
+      <div class="story-content-wrapper">
+        <p class="story-text-content">С Днём рождения ещё раз! Теперь эту вкладку можно спокойно закрыть.</p>
+        <p class="author-sign">Люблю тебя, папа ❤️</p>
+      </div>
+    </div>
+    <div class="footer-zone">
+      <button class="btn" id="btn-goodbye-back">Вернуться в квест</button>
+    </div>
+  </div>
+
+<!-- ПОПАП АЛЬБОМА -->
+<div class="album-overlay" id="album-popup">
+  <div class="album-content">
+    <button class="close-album" id="btn-album-close">×</button>
+    <div class="polaroid-frame" id="polaroid-element">
+      <div class="polaroid-img-box">
+        <img id="album-img" src="" alt="Коллаж">
+      </div>
+      <p class="polaroid-caption" id="album-photo-caption"></p>
+    </div>
+    <div class="album-nav">
+      <button class="nav-arrow" id="btn-album-prev">‹ Назад</button>
+      <span id="album-counter" style="color:var(--accent);font-weight:700;"></span>
+      <button class="nav-arrow" id="btn-album-next">Вперед ›</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   1) ДАННЫЕ КВЕСТА
+   ========================================================================= */
+const questSteps = [
+  { id: 1, img: "photo1.jpg", yearLabel: "Год 1", taskName: "Твоё появление", storyTitle: "Ты появилась на свет", storyBody: "В твоём случае победили X-хромосомы — и на свет появилась моя долгожданная девочка. 14 лет назад, когда я впервые бережно взял тебя на руки и поцеловал эти пухленькие щёчки своими колючками, я понял, что ты — моё главное чудо.", author: "Спасибо, что выбрала меня папой!", game: "demo" },
+  { id: 2, img: "photo2.jpg", yearLabel: "Год 2", taskName: "Начала ходить", storyTitle: "Первые шаги", storyBody: "Твои первые шаги были такими смешными и робкими. Размахивая ручками, ты топала, падала, но упрямо поднималась и шла дальше. Помни, родная, что в жизни всё устроено точно так же: случаются падения, но главное — не бояться встать и идти к своей цели.", author: "Я всегда тебя поддержу.", game: "demo" },
+  { id: 3, img: "photo3.jpg", yearLabel: "Год 3", taskName: "Начала говорить", storyTitle: "Первые слова", storyBody: "Я был счастлив, когда ты впервые осознанно и чётко сказала «папа». Это слово наполнило мою душу настоящей отцовской гордостью, и я в очередной раз осознал, что теперь у меня самая важная, ответственная и прекрасная роль на свете.", author: "Твое слово изменило всё.", game: "demo" },
+  { id: 4, img: "photo4.jpg", yearLabel: "Год 4", taskName: "Пошла в садик", storyTitle: "Первый садик", storyBody: "Для нас начинался совсем новый этап жизни. Мы оба тогда учились: ты — становиться самостоятельной, общаться с ребятами, делиться игрушками и дружить, а я — отпускать тебя на долгие часы и скучать по твоей милоте.", author: "Сложно, но важно.", game: "demo" },
+  { id: 5, img: "photo5.jpg", yearLabel: "Год 5", taskName: "Задавала вопросы", storyTitle: "Первые «Почему?»", storyBody: "Ты росла самой очаровательной почемучкой. Сотни твоих вопросов сыпались с утра до вечера, а я терпеливо отвечал, поражаясь твоему бескрайнему любопытству. Эти беседы заставляли меня смотреть на мир совершенно другими глазами. Спасибо.", author: "Ты — мой главный учитель.", game: "demo" },
+  { id: 6, img: "photo6.jpg", yearLabel: "Год 6", taskName: "Преодолеваешь страх", storyTitle: "Первые потери", storyBody: "Однажды, потеряв очередной молочный зуб, ты немного испугалась, но всё же спрятала его под подушку в ожидании волшебства. А когда среди ночи поймала папу в роли Зубного фея — мы смеялись до слёз! Помни, я всегда буду рядом, чтобы прогнать любые твои страхи и снова заставить тебя улыбаться.", author: "Ничего не бойся!", game: "demo" },
+  { id: 7, img: "photo7.jpg", yearLabel: "Год 7", taskName: "Пошла в школу", storyTitle: "Первый класс", storyBody: "Первое сентября. Школьная линейка. Нарядная, красивая причёска, букет в руках — с лёгким волнением ты ждала свой первый звонок, открывающий перед тобой новый интересный путь. Стояла такая серьёзная и уже совсем большая, а я смотрел на тебя со стороны, сдерживая слёзы от гордости за свою первоклашку.", author: "Тянись к знаниям!", game: "demo" },
+  { id: 8, img: "photo8.jpg", yearLabel: "Год 8", taskName: "Тянулась к прекрасному", storyTitle: "Первые увлечения", storyBody: "Тебе стало интересно всё и сразу — ты с азартом пробовала себя в творчестве, меняла хобби и увлечения. Я с восторгом наблюдал, как горели твои глаза от каждого нового результата! Ищи себя смело, пробуй, ошибайся и начинай заново — я всегда поддержу любое твоё искреннее «хочу» и останусь твоим главным зрителем.", author: "Верю в тебя!", game: "demo" },
+  { id: 9, img: "photo9.jpg", yearLabel: "Год 9", taskName: "Стремилась быть лучшей", storyTitle: "Первые победы", storyBody: "Ты росла целеустремлённой — шаг за шагом училась добиваться своего, даже когда было совсем нелегко. Видеть твою чистую радость от первых больших побед — огромное счастье. Твой характер и умение не сдаваться дороже любых школьных оценок.", author: "Только вперёд!", game: "demo" },
+  { id: 10, img: "photo10.jpg", yearLabel: "Год 10", taskName: "Училась дружить", storyTitle: "Первая дружба", storyBody: "В твоей жизни стали появляться по-настоящему близкие люди, чьё мнение и поддержка оказались для тебя особенно важны. Ты училась доверять, сопереживать и делить секреты. Настоящая дружба — это редкий и бесценный дар. Дорожи теми, кто искренне радуется твоим победам и готов подставить плечо в трудный день.", author: "Верных тебе друзей!", game: "demo" },
+  { id: 11, img: "photo11.jpg", yearLabel: "Год 11", taskName: "Менялась к лучшему", storyTitle: "Первые перемены", storyBody: "Ты заметно повзрослела — стала более задумчивой и серьёзной. Порой подолгу о чём-то размышляла наедине с собой. Я с замиранием сердца наблюдал, как расцветает твоя чуткая душа и появляется твой собственный взгляд на жизнь.", author: "Пусть мир любуется тобой!", game: "demo" },
+  { id: 12, img: "photo12.jpg", yearLabel: "Год 12", taskName: "Мечтала...", storyTitle: "Первые мечты", storyBody: "Ты всё чаще стала рассуждать о том, что ждёт тебя впереди. Пусть твои желания ещё не сложились в один большой план, но как же здорово, что ты умеешь так искренне и смело мечтать! Слушая тебя, я со светлой грустью и огромной радостью вижу, как ты растёшь.", author: "Пусть мечты сбудутся!", game: "demo" },
+  { id: 13, img: "photo13.jpg", yearLabel: "Год 13", taskName: "Рассуждала...", storyTitle: "Взрослый взгляд", storyBody: "Ты выросла красивой, умной девушкой со своими принципами и собственным мнением. Твои глубокие рассуждения о жизни и людях восхищают меня. Но помни, родная: сколько бы лет ни прошло, для меня ты навсегда останешься моей любимой маленькой Аришкой.", author: "Свети ярко!", game: "demo" }
+];
+
+const albumWishes = [
+    "Ты — моё главное чудо!",
+  "Пусть каждый день приносит радость.",
+  "Твоя улыбка делает мир добрее.",
+  "Будь самой счастливой на свете!",
+  "Мечтай смело, я всегда рядом.",
+  "Ты — моя гордость.",
+  "Пусть удача всегда будет с тобой.",
+  "Цени каждый момент жизни.",
+  "Ты достойна всего самого лучшего.",
+  "Пусть глаза всегда светятся от счастья.",
+  "Ты моя маленькая принцесса.",
+  "Верь в себя, и всё получится!",
+  "Ты — лучшее, что у меня есть.",
+  "Пусть жизнь будет сладкой.",
+  "Пусть сбудутся все твои мечты.",
+  "Ты — невероятная!",
+  "Пусть в твоей душе всегда будет весна.",
+  "Ты — моя вселенная.",
+  "Будь смелой и ничего не бойся.",
+  "С любовью, папа.",
+  "Твоя доброта освещает всё вокруг.",
+  "Пусть твоя жизнь будет полна ярких красок.",
+  "Ты способна на всё, помни об этом!",
+  "Никогда не сомневайся в своих силах.",
+  "Пусть каждый миг дарит вдохновение.",
+  "Ты — настоящее солнышко!",
+  "Оставайся всегда такой же искренней.",
+  "Пусть вокруг тебя будут только верные друзья.",
+  "Твой смех — лучшая музыка для меня.",
+  "Желаю тебе бесконечного вдохновения.",
+  "Пусть каждый твой шаг ведет к успеху.",
+  "Ты наполняешь этот мир смыслом.",
+  "Пусть в твоем сердце всегда живет любовь.",
+  "Улыбайся чаще, тебе это так идет!",
+  "Ты заслуживаешь самого огромного счастья.",
+  "Пусть жизнь приятно удивляет каждый день.",
+  "Ты — мое самое большое вдохновение.",
+  "Впереди тебя ждет много прекрасного!",
+  "Пусть все преграды легко исчезают.",
+  "Ты — уникальная и неповторимая.",
+  "Будь счастлива каждую секунду.",
+  "Твои возможности безграничны.",
+  "Пусть в твоем доме всегда будет уют и тепло.",
+  "Свети ярко и никогда не угасай!",
+  "Ты — украшение этого мира.",
+  "Пусть гармония всегда будет с тобой.",
+  "Открывай этот мир с радостью!",
+  "Ты сильная, умная и прекрасная.",
+  "Пусть удача летит за тобой по пятам.",
+  "Живи в удовольствие и кайфуй!",
+  "Ты — моя бесконечная радость.",
+  "Пусть каждый день дарит новый повод для улыбки.",
+  "Твори свою историю так, как хочется тебе.",
+  "Ты — сокровище, которое я очень ценю.",
+  "Обнимаю всем сердцем!"
+];
+
+/* =========================================================================
+   2) МЕНЕДЖЕР ИГР (ЗАГРУЗКА ИЗ ПАПКИ Games/ И ПРИЁМ СИГНАЛОВ)
+   ========================================================================= */
+const games = {
+  totalGames: 14,
+  // Ссылка на функцию победы текущего шага
+  currentOnWin: null,
+  // Ссылка на функцию прерывания текущего шага
+  currentOnAbort: null
+};
+
+// Слушаем сигналы от мини-игр, открытых внутри iframe
+window.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || typeof data !== "object") return;
+
+  // Если игра прислала сигнал победы
+  if (data.type === "QUEST_WIN" && typeof games.currentOnWin === "function") {
+    const winCallback = games.currentOnWin;
+    games.currentOnWin = null;
+    games.currentOnAbort = null;
+    winCallback();
+  }
+
+  // Если игра прислала сигнал прерывания / выхода
+  if (data.type === "QUEST_ABORT" && typeof games.currentOnAbort === "function") {
+    const abortCallback = games.currentOnAbort;
+    games.currentOnWin = null;
+    games.currentOnAbort = null;
+    abortCallback();
+  }
+});
+
+/* =========================================================================
+   3) КОНТРОЛЛЕР
+   ========================================================================= */
+let currentStepIndex = 0;
+let isArcadeMode = false;
+let isMuted = false;
+const bgMusic = document.getElementById('bg-music');
+
+window.addEventListener("DOMContentLoaded", () => {
+  initMagicSparkles();
+
+  const savedState = localStorage.getItem('quest_progress');
+  if (savedState) {
+    const state = JSON.parse(savedState);
+    currentStepIndex = state.stepIndex;
+    isMuted = state.isMuted;
+    
+    if (state.phase === 'final') {
+      localStorage.removeItem('quest_progress');
+      showScreen("screen-cover");
+      updateMuteBtn(true);
+      return;
+    }
+
+    if (currentStepIndex > 0 || state.phase === 'cover') {
+      updateMuteBtn(isMuted);
+      bgMusic.muted = isMuted;
+      
+      if (state.phase === 'cover') {
+        showScreen("screen-cover");
+      } else if (state.phase === 'story') {
+        goToStory(true);
+      } else {
+        goToGame();
+      }
+      return;
+    }
+  }
+  
+  showScreen("screen-cover");
+  updateMuteBtn(true);
+});
+
+function initMagicSparkles() {
+  const wrapper = document.getElementById('final-title-container');
+  for (let i = 0; i < 25; i++) {
+    const star = document.createElement('div');
+    star.className = 'magic-sparkle';
+    
+    const left = 5 + Math.random() * 90; 
+    const top = 0 + Math.random() * 100;
+    const size = 2 + Math.random() * 6;
+    const dx = (Math.random() - 0.5) * 80;
+    const dy = (Math.random() - 0.5) * 80;
+    
+    star.style.left = left + '%';
+    star.style.top = top + '%';
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+    star.style.setProperty('--dx', dx + 'px');
+    star.style.setProperty('--dy', dy + 'px');
+    
+    star.style.animation = `sparkleFly ${2.5 + Math.random() * 2}s ease-in-out ${Math.random() * 3}s infinite`;
+    
+    wrapper.appendChild(star);
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  if (typeof setSpacePaused === "function") {
+    setSpacePaused(id === "screen-game");
+  }
+}
+
+let currentPhase = 'cover';
+
+function saveProgress(phase) {
+  if (phase) currentPhase = phase;
+  localStorage.setItem('quest_progress', JSON.stringify({
+    stepIndex: currentStepIndex,
+    phase: currentPhase,
+    isMuted: isMuted
+  }));
+}
+
+
+document.getElementById("gift-box").addEventListener("click", () => {
+  const box = document.getElementById("gift-img");
+  box.style.transition = "transform 0.5s, opacity 0.5s";
+  box.style.transform = "scale(1.5)";
+  box.style.opacity = "0";
+  
+  setTimeout(() => {
+    bgMusic.play().catch(e => console.log("Ошибка аудио:", e));
+    updateMuteBtn(false);
+    bgMusic.muted = false;
+    isMuted = false;
+    showScreen("screen-start");
+  }, 500);
+});
+
+document.getElementById("btn-back-to-cover").addEventListener("click", () => {
+  const box = document.getElementById("gift-img");
+  box.style.transition = "none";
+  box.style.transform = "scale(1)";
+  box.style.opacity = "1";
+  showScreen("screen-cover");
+});
+
+document.getElementById("btn-start").addEventListener("click", () => {
+  currentStepIndex = 0;
+  saveProgress('game');
+  goToGame();
+});
+
+function goToGame() {
+  // Проверяем, запущена ли 14-я призовая игра (индекс 13)
+  const isBonusGame = (currentStepIndex === 13);
+  const step = questSteps[currentStepIndex];
+
+  // Если это не призовая игра и шага нет в массиве — выходим в финал
+  if (!isBonusGame && !step) return goToFinal();
+
+  bgMusic.pause();
+
+  // Подставляем заголовки: свои для призовой игры или из массива для обычных
+  if (isBonusGame) {
+    document.getElementById("game-step-label").textContent = "Год 14";
+    document.getElementById("game-task-name").textContent = "Кибер-Дрифт";
+  } else {
+    document.getElementById("game-step-label").textContent = step.yearLabel;
+    document.getElementById("game-task-name").textContent = step.taskName;
+  }
+
+  showScreen("screen-game");
+
+  const mountEl = document.getElementById("game-mount");
+  mountEl.innerHTML = "";
+  // Растягиваем контейнер игры на всю свободную область экрана
+  mountEl.style.cssText = "width:100%;height:100%;min-height:73vh;display:flex;flex-direction:column;";
+
+  // Вычисляем номер игры: для индекса 13 получится gameNumber = 14 -> Games/game14.html
+  const gameNumber = currentStepIndex + 1;
+  const gameUrl = `Games/game${gameNumber}.html`;
+
+  // Функция для показа красивой заглушки, если игра не найдена или сломалась
+  const showFallbackError = (reasonText) => {
+    mountEl.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:20px;text-align:center;">
+        <p style="color:#ff4a6a;font-size:1.1rem;margin-bottom:10px;">Ой! Игра №${gameNumber} пока не загрузилась</p>
+        <p style="color:#a29bfe;font-size:0.85rem;margin-bottom:20px;">${reasonText}</p>
+        <button class="btn btn-primary" id="fallback-skip-btn">Продолжить историю ✨</button>
+      </div>
+    `;
+    mountEl.querySelector("#fallback-skip-btn").addEventListener("click", () => {
+      mountEl.innerHTML = "";
+      goToStory();
+    });
+  };
+
+  // Защита: если шаг выходит за пределы 13 игр
+  if (gameNumber < 1 || gameNumber > games.totalGames) {
+    showFallbackError(`Файл ${gameUrl} не предусмотрен в списке игр.`);
+    return;
+  }
+
+  // Запоминаем действия при победе и при прерывании игры
+  games.currentOnWin = () => {
+    mountEl.innerHTML = ""; // Выгружаем игру из памяти телефона
+    if (isArcadeMode) {
+      openArcade(); // В режиме Игровой возвращаем обратно в список игр
+    } else {
+      goToStory(); // В режиме квеста идем дальше по сюжету
+    }
+  };
+
+  games.currentOnAbort = () => {
+    mountEl.innerHTML = ""; // Выгружаем игру из памяти телефона
+    if (isArcadeMode) {
+      openArcade();
+    } else if (currentStepIndex === 0) {
+      showScreen("screen-start");
+    } else {
+      goToStory();
+    }
+  };
+
+  // Создаём встроенное окно (iframe) для запуска отдельного HTML-файла игры
+  const iframe = document.createElement("iframe");
+  iframe.src = gameUrl;
+  iframe.style.cssText = "width:100%;height:100%;flex:1;border:none;border-radius:0;background:transparent;display:block;";
+  iframe.setAttribute("allow", "autoplay");
+
+  // Если браузер не смог загрузить файл
+  iframe.onerror = () => {
+    showFallbackError(`Не удалось открыть файл ${gameUrl}.`);
+  };
+
+  mountEl.appendChild(iframe);
+}
+
+function goToStory(silent = false) {
+  const step = questSteps[currentStepIndex];
+  if (!isMuted) bgMusic.play().catch(e => {});
+
+  document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
+  document.getElementById("story-body-text").textContent = step.storyBody;
+  document.getElementById("story-author-sign").textContent = step.author;
+  document.getElementById("story-img").src = "photos/" + step.img;
+
+  const scroller = document.getElementById("story-scroller");
+  if (scroller) scroller.scrollTop = 0;
+
+  document.getElementById("btn-back").classList.remove("btn-hidden");
+
+  showScreen("screen-story");
+  if (!silent) saveProgress('story');
+}
+
+function nextAfterStory() {
+  currentStepIndex++;
+  if (currentStepIndex < questSteps.length) {
+    saveProgress('game');
+    goToGame();
+  } else {
+    goToFinal();
+  }
+}
+
+function goBackFromStory() {
+  if (currentStepIndex === 0) {
+    showScreen("screen-start");
+    return;
+  }
+  
+  currentStepIndex--;
+  const step = questSteps[currentStepIndex];
+  document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
+  document.getElementById("story-body-text").textContent = step.storyBody;
+  document.getElementById("story-author-sign").textContent = step.author;
+  document.getElementById("story-img").src = "photos/" + step.img;
+  
+  showScreen("screen-story");
+  saveProgress('story');
+}
+
+function goToFinal() {
+  if (!isMuted) bgMusic.play().catch(e => {});
+  showScreen("screen-final");
+  saveProgress('final');
+}
+
+document.getElementById("btn-final-back").addEventListener("click", () => {
+  currentStepIndex = questSteps.length - 1;
+  const step = questSteps[currentStepIndex];
+  document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
+  document.getElementById("story-body-text").textContent = step.storyBody;
+  document.getElementById("story-author-sign").textContent = step.author;
+  document.getElementById("story-img").src = "photos/" + step.img;
+  showScreen("screen-story");
+  saveProgress('story');
+});
+
+document.getElementById("btn-restart").addEventListener("click", () => {
+  localStorage.removeItem('quest_progress');
+  currentStepIndex = 0;
+  const box = document.getElementById("gift-img");
+  box.style.transition = "none";
+  box.style.transform = "scale(1)";
+  box.style.opacity = "1";
+  showScreen("screen-cover");
+  updateMuteBtn(true);
+  bgMusic.pause();
+});
+
+// --- ЛОГИКА ИГРОВОЙ ---
+function openArcade() {
+  isArcadeMode = true;
+  if (!isMuted) bgMusic.play().catch(e => {});
+  
+  const grid = document.getElementById("arcade-grid");
+  grid.innerHTML = "";
+
+  // Впиши сюда свои названия строго по порядку игр (в кавычках через запятую)
+  const arcadeTitles = [
+    "Гендер-батл",
+    "Повторяйка!",
+    "Первые слова",
+    "Динь-Динь",
+    "Где логика?",
+    "Комната страха",
+    "5БУКВ",
+    "Букеты",
+    "Поскакушки",
+    "Морской бой",
+    "Пятнашки",
+    "Тетрис",
+    "Лови и убегай",
+    "КиберДрифт",
+
+  ];
+
+  questSteps.forEach((step, index) => {
+    const title = arcadeTitles[index] || step.taskName;
+
+    const btn = document.createElement("button");
+    btn.className = "arcade-btn";
+    btn.innerHTML = `
+      <span class="arcade-btn-num">Игра ${index + 1}</span>
+      <span class="arcade-btn-title">${title}</span>
+    `;
+    btn.addEventListener("click", () => {
+      currentStepIndex = index;
+      goToGame();
+    });
+    grid.appendChild(btn);
+  });
+  // Добавление 14-й призовой игры (она не входит в основной квест)
+  const bonusBtn = document.createElement("button");
+  bonusBtn.className = "arcade-btn";
+  bonusBtn.innerHTML = `
+    <span class="arcade-btn-num">Игра 14 (Призовая)</span>
+    <span class="arcade-btn-title">Кибер-Дрифт</span>
+  `;
+  bonusBtn.addEventListener("click", () => {
+    currentStepIndex = 13; // Индекс 13 соответствует 14-й игре (счет идет с 0)
+    goToGame();
+  });
+  grid.appendChild(bonusBtn);
+  showScreen("screen-arcade");
+}
+
+document.getElementById("btn-arcade").addEventListener("click", openArcade);
+
+document.getElementById("btn-arcade-back").addEventListener("click", () => {
+  isArcadeMode = false;
+  goToFinal();
+});
+
+// --- ЛОГИКА ВЫХОДА ---
+document.getElementById("btn-exit").addEventListener("click", () => {
+  bgMusic.pause();
+  // Пытаемся закрыть вкладку (сработает, если открыто как WebApp или через JS)
+  window.close();
+  // Если браузер заблокировал закрытие, показываем красивый экран прощания
+  setTimeout(() => {
+    showScreen("screen-goodbye");
+  }, 150);
+});
+
+document.getElementById("btn-goodbye-back").addEventListener("click", () => {
+  goToFinal();
+});
+
+document.getElementById("btn-story-next").addEventListener("click", nextAfterStory);
+document.getElementById("btn-back").addEventListener("click", goBackFromStory);
+
+const muteBtn = document.getElementById("mute-btn");
+function updateMuteBtn(muted) {
+  muteBtn.textContent = muted ? "🔇" : "🔊";
+}
+muteBtn.addEventListener("click", () => {
+  isMuted = !isMuted;
+  bgMusic.muted = isMuted;
+  if (!isMuted && currentPhase !== 'game' && currentPhase !== 'cover' && bgMusic.paused) {
+    bgMusic.play().catch(e => {});
+  }
+  updateMuteBtn(isMuted);
+  saveProgress(currentPhase);
+});
+
+function initSwipe(zoneId, onSwipeLeft, onSwipeRight) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  
+  let startX = 0, startY = 0;
+  zone.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+  }, { passive: true });
+  
+  zone.addEventListener("touchend", (e) => {
+    const diffX = e.changedTouches[0].clientX - startX;
+    const diffY = e.changedTouches[0].clientY - startY;
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      if (diffX > 0) onSwipeRight();
+      else onSwipeLeft();
+    }
+  }, { passive: true });
+}
+
+initSwipe("swipe-zone-story", () => nextAfterStory(), () => goBackFromStory());
+
+/* АЛЬБОМ */
+let albumPhotos = [];
+let currentPhotoIndex = 1;
+const probeImg = new Image();
+
+probeImg.onload = () => {
+  albumPhotos.push(`collage (${currentPhotoIndex}).jpg`);
+  currentPhotoIndex++;
+  findAlbumPhotos();
+};
+
+probeImg.onerror = () => {
+  if (albumPhotos.length === 0) {
+    document.getElementById("btn-album").style.display = "none";
+  }
+  console.log("Найдено фото для альбома:", albumPhotos.length);
+};
+
+function findAlbumPhotos() {
+  probeImg.src = `photos/collages/collage (${currentPhotoIndex}).jpg`;
+}
+
+findAlbumPhotos();
+
+let albumIndex = 0;
+document.getElementById("btn-album").addEventListener("click", () => {
+  if (albumPhotos.length === 0) return;
+  albumIndex = 0; renderAlbumPhoto();
+  document.getElementById("album-popup").style.display = "flex";
+});
+document.getElementById("btn-album-close").addEventListener("click", () => {
+  document.getElementById("album-popup").style.display = "none";
+});
+document.getElementById("btn-album-prev").addEventListener("click", () => {
+  if (albumPhotos.length === 0) return;
+  albumIndex = (albumIndex - 1 + albumPhotos.length) % albumPhotos.length;
+  renderAlbumPhoto();
+});
+document.getElementById("btn-album-next").addEventListener("click", () => {
+  if (albumPhotos.length === 0) return;
+  albumIndex = (albumIndex + 1) % albumPhotos.length;
+  renderAlbumPhoto();
+});
+
+function renderAlbumPhoto() {
+  if (albumPhotos.length === 0) return;
+  document.getElementById("album-img").src = "photos/collages/" + albumPhotos[albumIndex];
+  const currentWish = albumWishes[albumIndex % albumWishes.length];
+  document.getElementById("album-photo-caption").textContent = currentWish;
+  document.getElementById("album-counter").textContent = (albumIndex + 1) + " / " + albumPhotos.length;
+}
+
+/* =========================================================================
+   4) ГЕНЕРАЦИЯ ЗВЕЗДНОГО НЕБА И КОМЕТ (НОВЫЙ БЛОК)
+   ========================================================================= */
+const bgLayer = document.getElementById('space-bg');
+
+// Генерация звезд
+const starCount = 46; 
+const minRadius = 20; 
+const maxRadius = 400; 
+const allStars = [];
+
+for (let i = 0; i < starCount; i++) {
+  const orbit = document.createElement('div');
+  orbit.className = 'orbit';
+
+  const radiusFactor = Math.pow(Math.random(), 0.4); 
+  const radius = minRadius + radiusFactor * (maxRadius - minRadius);
+  orbit.style.setProperty('--radius', radius + 'px');
+
+  const baseSpeed = 88; 
+  const speedVariation = 0.85 + Math.random() * 0.3; 
+  orbit.style.setProperty('--orbit-speed', (baseSpeed * speedVariation) + 's');
+  orbit.style.setProperty('--orbit-delay', (Math.random() * -150) + 's');
+
+  const star = document.createElement('div');
+  
+  const isLong = Math.random() > 0.5;
+  star.className = isLong ? 'star long' : 'star classic';
+
+  const size = 4 + Math.random() * 8.1; 
+  star.style.setProperty('--star-size', size + 'px');
+
+  const spinSpeed = 1.5 + Math.random() * 3.5;
+  star.style.setProperty('--spin-speed', spinSpeed + 's');
+  star.style.setProperty('--spin-delay', (Math.random() * -5) + 's');
+
+  const pulseSpeed = 0.8 + Math.random() * 1.7;
+  star.style.setProperty('--pulse-speed', pulseSpeed + 's');
+  star.style.setProperty('--pulse-delay', (Math.random() * -2) + 's');
+
+  orbit.appendChild(star);
+  bgLayer.appendChild(orbit);
+  allStars.push({ element: star });
+}
+
+// Смена цветов
+const colorClasses = ['color-white', 'color-gold', 'color-blue', 'color-pink'];
+
+function applyColorFormula() {
+  const dominantIndex = Math.floor(Math.random() * colorClasses.length);
+  let colorsToApply = [];
+  
+  const countDominant = Math.floor(allStars.length * 0.5);
+  for (let i = 0; i < countDominant; i++) colorsToApply.push(colorClasses[dominantIndex]);
+
+  const secondIndex = (dominantIndex + 1) % 4;
+  const countSecond = Math.floor(allStars.length * 0.3);
+  for (let i = 0; i < countSecond; i++) colorsToApply.push(colorClasses[secondIndex]);
+
+  const thirdIndex = (dominantIndex + 2) % 4;
+  const countThird = Math.floor(allStars.length * 0.14);
+  for (let i = 0; i < countThird; i++) colorsToApply.push(colorClasses[thirdIndex]);
+
+  const fourthIndex = (dominantIndex + 3) % 4;
+  const countFourth = allStars.length - colorsToApply.length;
+  for (let i = 0; i < countFourth; i++) colorsToApply.push(colorClasses[fourthIndex]);
+
+  for (let i = colorsToApply.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [colorsToApply[i], colorsToApply[j]] = [colorsToApply[j], colorsToApply[i]];
+  }
+
+  allStars.forEach((starObj, index) => {
+    colorClasses.forEach(c => starObj.element.classList.remove(c));
+    starObj.element.classList.add(colorsToApply[index]);
+  });
+}
+
+applyColorFormula();
+
+// Вспышки звезд
+function triggerStarburst() {
+  const count = 3 + Math.floor(Math.random() * 5); 
+  const shuffled = [...allStars].sort(() => 0.5 - Math.random());
+  const selected = shuffled.slice(0, count);
+
+  selected.forEach((starObj) => {
+    starObj.element.classList.add('stretch');
+    const duration = 1000 + Math.random() * 4000;
+    setTimeout(() => starObj.element.classList.remove('stretch'), duration);
+  });
+}
+
+// Кометы
+function createComet() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  let startX, startY, endX, endY;
+  const direction = Math.floor(Math.random() * 4);
+
+  switch(direction) {
+    case 0: // Сверху вниз
+      startX = Math.random() * width; startY = -100;
+      endX = Math.random() * width; endY = height + 100;
+      break;
+    case 1: // Снизу вверх
+      startX = Math.random() * width; startY = height + 100;
+      endX = Math.random() * width; endY = -100;
+      break;
+    case 2: // Слева направо
+      startX = -100; startY = Math.random() * height;
+      endX = width + 100; endY = Math.random() * height;
+      break;
+    case 3: // Справа налево
+      startX = width + 100; startY = Math.random() * height;
+      endX = -100; endY = Math.random() * height;
+      break;
+  }
+
+  const deltaX = endX - startX;
+  const deltaY = endY - startY;
+  const angleRad = Math.atan2(deltaY, deltaX);
+  const angleDeg = angleRad * (180 / Math.PI);
+
+  const duration = 0.8 + Math.random() * 0.7;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'comet-wrapper';
+  wrapper.style.setProperty('--fly-duration', duration + 's');
+  
+  const inner = document.createElement('div');
+  inner.className = 'comet-inner';
+  inner.style.setProperty('--angle', angleDeg + 'deg');
+
+  const tail = document.createElement('div');
+  tail.className = 'comet-tail';
+  
+  const head = document.createElement('div');
+  head.className = 'comet-head';
+
+  inner.appendChild(tail);
+  inner.appendChild(head);
+  wrapper.appendChild(inner);
+
+  wrapper.animate([
+    { transform: `translate(${startX}px, ${startY}px)` },
+    { transform: `translate(${endX}px, ${endY}px)` }
+  ], {
+    duration: duration * 1000,
+    easing: 'linear',
+    fill: 'forwards'
+  });
+
+  bgLayer.appendChild(wrapper);
+
+  setTimeout(() => {
+    wrapper.remove();
+  }, duration * 1000);
+}
+let colorTimer = null;
+let burstTimer = null;
+let cometTimer = null;
+let isSpacePaused = true;
+
+function setSpacePaused(paused) {
+  if (isSpacePaused === paused) return;
+  isSpacePaused = paused;
+
+  if (paused) {
+    bgLayer.classList.add('paused');
+    clearInterval(colorTimer);
+    clearInterval(burstTimer);
+    clearInterval(cometTimer);
+    colorTimer = burstTimer = cometTimer = null;
+    bgLayer.querySelectorAll('.comet-wrapper').forEach(c => c.remove());
+  } else {
+    bgLayer.classList.remove('paused');
+    if (!colorTimer) colorTimer = setInterval(applyColorFormula, 5000);
+    if (!burstTimer) burstTimer = setInterval(triggerStarburst, 2500);
+    if (!cometTimer) {
+      cometTimer = setInterval(() => {
+        if (!isSpacePaused && Math.random() > 0.4) createComet();
+      }, 2000);
+    }
+  }
+}
+
+setSpacePaused(false);
+
+</script>
+</body>
+</html>
