@@ -1009,6 +1009,7 @@ document.getElementById("gift-box").addEventListener("click", () => {
     bgMusic.muted = false;
     isMuted = false;
     showScreen("screen-start");
+    preloadStepAssets(0);
   }, 500);
 });
 
@@ -1025,6 +1026,17 @@ document.getElementById("btn-start").addEventListener("click", () => {
   saveProgress('game');
   goToGame();
 });
+
+// Предзагрузка фото текущего и следующего шага в кэш телефона
+function preloadStepAssets(index) {
+  [index, index + 1].forEach((i) => {
+    const s = questSteps[i];
+    if (s && s.img) {
+      const img = new Image();
+      img.src = "photos/" + s.img;
+    }
+  });
+}
 
 function goToGame() {
   // Проверяем, запущена ли 14-я призовая игра (индекс 13)
@@ -1047,6 +1059,7 @@ function goToGame() {
   }
 
   showScreen("screen-game");
+  preloadStepAssets(currentStepIndex);
 
   const mountEl = document.getElementById("game-mount");
   mountEl.innerHTML = "";
@@ -1133,6 +1146,7 @@ function goToStory(silent = false) {
   document.getElementById("btn-back").classList.remove("btn-hidden");
 
   showScreen("screen-story");
+  preloadStepAssets(currentStepIndex + 1);
   if (!silent) saveProgress('story');
 }
 
