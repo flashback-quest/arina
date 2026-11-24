@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Подарок Арине</title>
+<title>Подарок Аришке</title>
 
 <!-- Подключение фавикона (иконки сайта) -->
 <link rel="icon" href="favicon.ico" sizes="any">
@@ -12,7 +12,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Nunito:ital,wght@0,400;0,700;1,400&display=block" rel="stylesheet">
 
 <style>
 /* =========================================================================
@@ -267,10 +267,10 @@ h1 {
    ========================================================================= */
 .only-for-you-wrapper {
   position: relative; display: inline-block;
-  transform: rotate(-2deg);
+  transform: rotate(-2deg) scale(1.2);
 }
 .underline-svg {
-  position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
+  position: absolute; bottom: 1px; left: 0; width: 100%; height: 20px;
   overflow: visible; pointer-events: none;
 }
 .underline-svg path {
@@ -597,10 +597,6 @@ h1 {
   line-height: 1.2;
 }
 
-/* Делаем 13-ю (нечётную) кнопку на всю ширину */
-.arcade-btn:last-child:nth-child(odd) {
-  grid-column: span 2;
-}
 </style>
 </head>
 
@@ -658,7 +654,7 @@ h1 {
   <!-- ЭКРАН СТАРТА -->
   <div id="screen-start" class="screen">
     <div class="header-zone">
-      <p class="subtitle">Секретный квест</p>
+      <p class="subtitle">Личный квест</p>
       <h1>С Днём рождения!</h1>
     </div>
     <div class="content-zone">
@@ -667,10 +663,11 @@ h1 {
           <img src="photos/photo1_1.jpg" alt="Арина">
         </div>
         <p class="story-text-content">
-          Доня, я знаю, как сильно ты любишь квесты!
-Поэтому я с огромной любовью создал этот секретный интерактивный квест-сайт лично для тебя.
-Нас ждет увлекательное путешествие по самым тёплым и весёлым воспоминаниям.
-Разгадай все тайны! Готова?.. Тогда — вперёд! ✨
+          Доня, я знаю, как сильно ты любишь квесты.
+Специально к твоему дню рождения я с огромной любовью создал этот интерактивный сайт.
+Тебя ждёт путешествие по самым ярким, тёплым и весёлым воспоминаниям — с играми, фотографиями и моими пожеланиями.
+Пройди все уровни и открой секретный фотоальбом!
+Готова?.. Тогда — вперёд! ✨
         </p>
       </div>
     </div>
@@ -773,6 +770,7 @@ h1 {
       <button class="btn" id="btn-goodbye-back">Вернуться в квест</button>
     </div>
   </div>
+</div>
 
 <!-- ПОПАП АЛЬБОМА -->
 <div class="album-overlay" id="album-popup">
@@ -909,37 +907,42 @@ window.addEventListener("message", (event) => {
 let currentStepIndex = 0;
 let isArcadeMode = false;
 let isMuted = false;
+let savedMusicTime = 0;
 const bgMusic = document.getElementById('bg-music');
 
 window.addEventListener("DOMContentLoaded", () => {
   initMagicSparkles();
 
-  const savedState = localStorage.getItem('quest_progress');
-  if (savedState) {
-    const state = JSON.parse(savedState);
-    currentStepIndex = state.stepIndex;
-    isMuted = state.isMuted;
-    
-    if (state.phase === 'final') {
-      localStorage.removeItem('quest_progress');
-      showScreen("screen-cover");
-      updateMuteBtn(true);
-      return;
-    }
-
-    if (currentStepIndex > 0 || state.phase === 'cover') {
-      updateMuteBtn(isMuted);
-      bgMusic.muted = isMuted;
+  try {
+    const savedState = localStorage.getItem('quest_progress');
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      currentStepIndex = state.stepIndex || 0;
+      isMuted = Boolean(state.isMuted);
       
-      if (state.phase === 'cover') {
+      if (state.phase === 'final') {
+        localStorage.removeItem('quest_progress');
         showScreen("screen-cover");
-      } else if (state.phase === 'story') {
-        goToStory(true);
-      } else {
-        goToGame();
+        updateMuteBtn(true);
+        return;
       }
-      return;
+
+      if (currentStepIndex > 0 || state.phase === 'cover') {
+        updateMuteBtn(isMuted);
+        bgMusic.muted = isMuted;
+        
+        if (state.phase === 'cover') {
+          showScreen("screen-cover");
+        } else if (state.phase === 'story') {
+          goToStory(true);
+        } else {
+          goToGame();
+        }
+        return;
+      }
     }
+  } catch (e) {
+    console.warn("Не удалось прочитать сохранение:", e);
   }
   
   showScreen("screen-cover");
@@ -983,13 +986,16 @@ let currentPhase = 'cover';
 
 function saveProgress(phase) {
   if (phase) currentPhase = phase;
-  localStorage.setItem('quest_progress', JSON.stringify({
-    stepIndex: currentStepIndex,
-    phase: currentPhase,
-    isMuted: isMuted
-  }));
+  try {
+    localStorage.setItem('quest_progress', JSON.stringify({
+      stepIndex: currentStepIndex,
+      phase: currentPhase,
+      isMuted: isMuted
+    }));
+  } catch (e) {
+    console.warn("Сохранение недоступно:", e);
+  }
 }
-
 
 document.getElementById("gift-box").addEventListener("click", () => {
   const box = document.getElementById("gift-img");
@@ -1028,6 +1034,7 @@ function goToGame() {
   // Если это не призовая игра и шага нет в массиве — выходим в финал
   if (!isBonusGame && !step) return goToFinal();
 
+  if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
   bgMusic.pause();
 
   // Подставляем заголовки: свои для призовой игры или из массива для обычных
@@ -1108,7 +1115,12 @@ function goToGame() {
 
 function goToStory(silent = false) {
   const step = questSteps[currentStepIndex];
-  if (!isMuted) bgMusic.play().catch(e => {});
+  if (!isMuted) {
+    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
+      bgMusic.currentTime = savedMusicTime;
+    }
+    bgMusic.play().catch(e => {});
+  }
 
   document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
   document.getElementById("story-body-text").textContent = step.storyBody;
@@ -1152,7 +1164,12 @@ function goBackFromStory() {
 }
 
 function goToFinal() {
-  if (!isMuted) bgMusic.play().catch(e => {});
+  if (!isMuted) {
+    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
+      bgMusic.currentTime = savedMusicTime;
+    }
+    bgMusic.play().catch(e => {});
+  }
   showScreen("screen-final");
   saveProgress('final');
 }
@@ -1203,7 +1220,6 @@ function openArcade() {
     "Пятнашки",
     "Тетрис",
     "Лови и убегай",
-    "КиберДрифт",
 
   ];
 
@@ -1226,7 +1242,7 @@ function openArcade() {
   const bonusBtn = document.createElement("button");
   bonusBtn.className = "arcade-btn";
   bonusBtn.innerHTML = `
-    <span class="arcade-btn-num">Игра 14 (Призовая)</span>
+    <span class="arcade-btn-num">Игра 14 (Бонус)</span>
     <span class="arcade-btn-title">Кибер-Дрифт</span>
   `;
   bonusBtn.addEventListener("click", () => {
@@ -1348,6 +1364,12 @@ function renderAlbumPhoto() {
   document.getElementById("album-photo-caption").textContent = currentWish;
   document.getElementById("album-counter").textContent = (albumIndex + 1) + " / " + albumPhotos.length;
 }
+
+// Перелистывание фоток в альбоме свайпом пальца
+initSwipe("polaroid-element", 
+  () => document.getElementById("btn-album-next").click(), 
+  () => document.getElementById("btn-album-prev").click()
+);
 
 /* =========================================================================
    4) ГЕНЕРАЦИЯ ЗВЕЗДНОГО НЕБА И КОМЕТ (НОВЫЙ БЛОК)
@@ -1536,6 +1558,21 @@ function setSpacePaused(paused) {
     }
   }
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    setSpacePaused(true);
+    if (!bgMusic.paused) bgMusic.pause();
+  } else {
+    const activeScreen = document.querySelector(".screen.active");
+    if (activeScreen && activeScreen.id !== "screen-game") {
+      setSpacePaused(false);
+      if (!isMuted && activeScreen.id !== "screen-cover") {
+        bgMusic.play().catch(() => {});
+      }
+    }
+  }
+});
 
 setSpacePaused(false);
 
