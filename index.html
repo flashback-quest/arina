@@ -1285,9 +1285,20 @@ function updateMuteBtn(muted) {
 muteBtn.addEventListener("click", () => {
   isMuted = !isMuted;
   bgMusic.muted = isMuted;
-  if (!isMuted && currentPhase !== 'game' && currentPhase !== 'cover' && bgMusic.paused) {
-    bgMusic.play().catch(e => {});
+
+  if (isMuted) {
+    if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
+    bgMusic.pause();
+  } else {
+    const activeScreen = document.querySelector(".screen.active");
+    if (activeScreen && activeScreen.id !== "screen-game") {
+      if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
+        bgMusic.currentTime = savedMusicTime;
+      }
+      bgMusic.play().catch(e => {});
+    }
   }
+
   updateMuteBtn(isMuted);
   saveProgress(currentPhase);
 });
