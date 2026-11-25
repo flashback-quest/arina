@@ -18,7 +18,7 @@
   #game {
     position: relative;
     width: min(100vw, 480px);
-    height: 100vh;
+    height: 100%; /* Изменено с 100vh для стабильности на мобильных */
     background: #0a0f1e;
     overflow: hidden;
     transition: transform 0.06s;
@@ -30,7 +30,15 @@
     50% { transform: translateX(8px) rotate(1deg); }
     75% { transform: translateX(-5px); }
   }
-  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  canvas { 
+    display: block; 
+    width: 100%; 
+    height: 100%; 
+    touch-action: none; 
+    outline: none; 
+    border: none; 
+    vertical-align: top; 
+  }
 
   #fairyImg {
     position: absolute; top: 0; left: 0;
@@ -530,9 +538,8 @@
   function buildCloudSprite(w) {
     const h = w * 0.5;
     const pad = 30;
-    const cw = w + pad * 2;      // 70 + 60 = 130 (ширина контента 77)
-    const ch = 54 + pad * 2;     // 114
-    // Оригинальный контент: X ∈ [-38.5, +38.5], Y ∈ [-33, +21]
+    const cw = w + pad * 2;
+    const ch = 54 + pad * 2;
     const originX = (w * 0.55) + pad;
     const originY = 33 + pad;
     makeSprite('cloud', cw, ch, originX, originY, (c) => {
@@ -657,13 +664,13 @@
     const color = WING_PALETTES[theme];
     if (type === 'upper') {
       const pad = 24;
-      const w = 44 + pad * 2;   // 92
-      const h = 83 + pad * 2;   // 131
+      const w = 44 + pad * 2;
+      const h = 83 + pad * 2;
       makeSprite(key, w, h, pad, h - pad, (c) => drawUpperWingShape(c, color));
     } else {
       const pad = 22;
-      const w = 40 + pad * 2;   // 84
-      const h = 46 + pad * 2;   // 90
+      const w = 40 + pad * 2;
+      const h = 46 + pad * 2;
       makeSprite(key, w, h, pad, pad, (c) => drawLowerWingShape(c, color));
     }
   }
@@ -789,9 +796,15 @@
   function resize() {
     const rect = canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    W = rect.width; H = rect.height;
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
+    
+    // Задаем точные физические размеры
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    
+    // Вычисляем логические размеры ИЗ физических, чтобы избежать рассинхрона
+    W = canvas.width / dpr;
+    H = canvas.height / dpr;
+    
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Кэшируем градиент фона один раз (пересоздаём при смене размера)
@@ -1115,7 +1128,7 @@
      RENDER
      ============================================================ */
   function render() {
-    // Фон — готовый градиент
+    // Фон — готовый градиент (W и H теперь точно совпадают с физическим пикселем)
     ctx.fillStyle = bgGradient || '#0a0f1e';
     ctx.fillRect(0, 0, W, H);
 
@@ -1129,7 +1142,7 @@
     }
     ctx.globalAlpha = 1;
 
-    // Молнии (редкие, оставляем как было)
+    // Молнии
     for (const l of state.lightnings) {
       ctx.save();
       ctx.shadowColor = '#ffff00'; ctx.shadowBlur = 30;
@@ -1151,14 +1164,14 @@
       else if (e.type === 'cloud') drawCloud(e);
     }
 
-    // Частицы — батчинг по цвету и квантованному alpha
+    // Частицы — батчинг
     if (state.particles.length) {
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
       const buckets = {};
       for (const p of state.particles) {
         const a = Math.max(0, Math.min(1, p.life / p.maxLife));
-        const bucketA = Math.ceil(a * 5) / 5;       // 0.2, 0.4, 0.6, 0.8, 1.0
+        const bucketA = Math.ceil(a * 5) / 5;
         if (bucketA <= 0) continue;
         const key = p.color + '|' + bucketA.toFixed(1);
         let b = buckets[key];
@@ -1426,7 +1439,6 @@
     ctx.save();
     ctx.translate(e.x, e.y);
     drawSprite('cloud', 0, 0);
-    // Пульсация перед ударом — рисуем поверх спрайта, дёшево
     if (e.timer < 0.4) {
       const w = e.width || 70;
       const pulse = 1 - e.timer / 0.4;
