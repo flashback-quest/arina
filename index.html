@@ -910,6 +910,40 @@ let isMuted = false;
 let savedMusicTime = 0;
 const bgMusic = document.getElementById('bg-music');
 
+// Сохраняем, на какой секунде стоит музыка, чтобы продолжить ровно с неё
+// после случайной перезагрузки страницы (например, телефон "уснул")
+function saveMusicTime() {
+  savedMusicTime = bgMusic.currentTime || 0;
+  try {
+    localStorage.setItem('music_time', String(savedMusicTime));
+  } catch (e) {}
+}
+
+// Ставим музыку на паузу и запоминаем точное место остановки
+function pauseMusicWithSave() {
+  if (!bgMusic.paused) saveMusicTime();
+  bgMusic.pause();
+}
+
+// Продолжаем игру плеера ровно с того места, где остановились (без перемоток назад)
+function resumeMusic() {
+  if (isMuted) return;
+  if (bgMusic.paused && savedMusicTime > 0) {
+    bgMusic.currentTime = savedMusicTime;
+  }
+  bgMusic.play().catch(e => {});
+}
+
+try {
+  const savedT = parseFloat(localStorage.getItem('music_time'));
+  if (!isNaN(savedT) && savedT > 0) savedMusicTime = savedT;
+} catch (e) {}
+
+window.addEventListener("pagehide", saveMusicTime);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === 'hidden') saveMusicTime();
+});
+
 window.addEventListener("DOMContentLoaded", () => {
   initMagicSparkles();
 
@@ -930,6 +964,20 @@ window.addEventListener("DOMContentLoaded", () => {
       if (currentStepIndex > 0 || state.phase === 'cover') {
         updateMuteBtn(isMuted);
         bgMusic.muted = isMuted;
+        
+        // Восстанавливаем позицию музыки после "засыпания" телефона.
+        // Safari в режиме приложения не умеет продолжать звук сам,
+        // поэтому включаем его с нужной секунды при первом же касании экрана.
+        if (!isMuted && savedMusicTime > 0) {
+          const restoreMusicOnce = () => {
+            bgMusic.currentTime = savedMusicTime;
+            bgMusic.play().catch(e => {});
+            document.removeEventListener('touchstart', restoreMusicOnce);
+            document.removeEventListener('click', restoreMusicOnce);
+          };
+          document.addEventListener('touchstart', restoreMusicOnce);
+          document.addEventListener('click', restoreMusicOnce);
+        }
         
         if (state.phase === 'cover') {
           showScreen("screen-cover");
@@ -1046,8 +1094,7 @@ function goToGame() {
   // Если это не призовая игра и шага нет в массиве — выходим в финал
   if (!isBonusGame && !step) return goToFinal();
 
-  if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
-  bgMusic.pause();
+  pauseMusicWithSave();
 
   // Подставляем заголовки: свои для призовой игры или из массива для обычных
   if (isBonusGame) {
@@ -1129,10 +1176,7 @@ function goToGame() {
 function goToStory(silent = false) {
   const step = questSteps[currentStepIndex];
   if (!isMuted) {
-    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
-      bgMusic.currentTime = savedMusicTime;
-    }
-    bgMusic.play().catch(e => {});
+    resumeMusic();
   }
 
   document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
@@ -1179,10 +1223,7 @@ function goBackFromStory() {
 
 function goToFinal() {
   if (!isMuted) {
-    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
-      bgMusic.currentTime = savedMusicTime;
-    }
-    bgMusic.play().catch(e => {});
+    resumeMusic();
   }
   showScreen("screen-final");
   saveProgress('final');
@@ -1201,20 +1242,32 @@ document.getElementById("btn-final-back").addEventListener("click", () => {
 
 document.getElementById("btn-restart").addEventListener("click", () => {
   localStorage.removeItem('quest_progress');
+  localStorage.removeItem('music_time');
+  savedMusicTime = 0;
   currentStepIndex = 0;
+  isArcadeMode = false;
+  // Возвращаем кнопку звука в обычное состояние (не заглушена)
+  isMuted = false;
+  bgMusic.muted = false;
+  updateMuteBtn(false);
+  // Полностью останавливаем и отматываем музыку в самое начало
+  bgMusic.pause();
+  try { bgMusic.currentTime = 0; } catch (e) {}
+  // Закрываем попап альбома, если он был открыт
+  const albumPopup = document.getElementById("album-popup");
+  if (albumPopup) albumPopup.style.display = "none";
+  // Возвращаем картинку подарка в исходное состояние
   const box = document.getElementById("gift-img");
   box.style.transition = "none";
   box.style.transform = "scale(1)";
   box.style.opacity = "1";
   showScreen("screen-cover");
-  updateMuteBtn(true);
-  bgMusic.pause();
 });
 
 // --- ЛОГИКА ИГРОВОЙ ---
 function openArcade() {
   isArcadeMode = true;
-  if (!isMuted) bgMusic.play().catch(e => {});
+  if (!isMuted) resumeMusic();
   
   const grid = document.getElementById("arcade-grid");
   grid.innerHTML = "";
@@ -1276,7 +1329,7 @@ document.getElementById("btn-arcade-back").addEventListener("click", () => {
 
 // --- ЛОГИКА ВЫХОДА ---
 document.getElementById("btn-exit").addEventListener("click", () => {
-  bgMusic.pause();
+  pauseMusicWithSave();
   // Пытаемся закрыть вкладку (сработает, если открыто как WebApp или через JS)
   window.close();
   // Если браузер заблокировал закрытие, показываем красивый экран прощания
@@ -1301,15 +1354,11 @@ muteBtn.addEventListener("click", () => {
   bgMusic.muted = isMuted;
 
   if (isMuted) {
-    if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
-    bgMusic.pause();
+    pauseMusicWithSave();
   } else {
     const activeScreen = document.querySelector(".screen.active");
     if (activeScreen && activeScreen.id !== "screen-game") {
-      if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
-        bgMusic.currentTime = savedMusicTime;
-      }
-      bgMusic.play().catch(e => {});
+      resumeMusic();
     }
   }
 
