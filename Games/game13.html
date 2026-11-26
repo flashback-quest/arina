@@ -27,15 +27,13 @@
             align-items: center;
         }
         canvas {
-            background: #6bb9f0;
+            background: linear-gradient(to bottom, #6bb9f0, #9b8df2);
             max-width: 100%;
             max-height: 100%;
             touch-action: none;
             display: block;
-            transform: translateZ(0);
         }
 
-        /* Кнопки управления (Пауза и Звук) */
         .top-controls {
             position: absolute;
             top: max(12px, env(safe-area-inset-top));
@@ -149,7 +147,7 @@
         <button id="muteBtn" class="hud-btn" title="Звуковые эффекты">🔊</button>
     </div>
 
-    <canvas id="gameCanvas" width="600" height="800"></canvas>
+    <canvas id="gameCanvas" width="420" height="560"></canvas>
 
     <div id="startOverlay" class="overlay active">
         <h1>💩 АпоКаКаЛипсис 💩</h1>
@@ -189,7 +187,10 @@
     const muteBtn = document.getElementById('muteBtn');
     const musicBtn = document.getElementById('musicBtn');
 
-    // Предварительно созданный градиент неба (вместо перерисовки средствами CSS)
+    // Масштаб относительно базовой логики 600x800 (420 / 600 = 0.7)
+    const SCALE = 0.7;
+
+    // Предварительно создаём градиент неба один раз, чтобы не пересчитывать каждый кадр
     const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
     skyGradient.addColorStop(0, '#6bb9f0');
     skyGradient.addColorStop(1, '#9b8df2');
@@ -200,7 +201,7 @@
     const bgMusic = new Audio('../music/posol_fon_kakahi.mp3');
     bgMusic.loop = true;
     bgMusic.volume = 0.35;
-    bgMusic.preload = 'none';
+    bgMusic.preload = 'auto';
 
     let isMusicEnabled = true;
     let isMusicStarted = false;
@@ -239,12 +240,12 @@
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
+    let bagNoiseBuffer = null;
     const soundBuffers = {};
     const htmlAudioPool = {};
     const isLocalFile = window.location.protocol === 'file:';
     let isAudioUnlocked = false;
     let isMuted = false;
-    let cachedBagNoiseBuffer = null;
 
     Object.keys(soundFiles).forEach(key => {
         const a = new Audio(soundFiles[key]);
@@ -264,8 +265,8 @@
         }
     }
 
-    function buildBagNoiseBuffer() {
-        if (!audioCtx || cachedBagNoiseBuffer) return;
+    function createBagNoiseBuffer() {
+        if (!audioCtx || bagNoiseBuffer) return;
         try {
             const dur = 0.14;
             const bufSize = Math.floor(audioCtx.sampleRate * dur);
@@ -274,7 +275,7 @@
             for (let i = 0; i < bufSize; i++) {
                 data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
             }
-            cachedBagNoiseBuffer = noiseBuf;
+            bagNoiseBuffer = noiseBuf;
         } catch (e) {}
     }
 
@@ -287,6 +288,7 @@
         }
         if (!isAudioUnlocked && audioCtx) {
             isAudioUnlocked = true;
+            createBagNoiseBuffer();
             try {
                 const buffer = audioCtx.createBuffer(1, 1, 22050);
                 const source = audioCtx.createBufferSource();
@@ -294,7 +296,6 @@
                 source.connect(audioCtx.destination);
                 source.start(0);
             } catch (e) {}
-            buildBagNoiseBuffer();
             Object.keys(soundFiles).forEach(key => loadSoundBuffer(key, soundFiles[key]));
         }
         if (isMusicEnabled && !isMusicStarted) {
@@ -353,10 +354,9 @@
                 const now = audioCtx.currentTime;
 
                 if (effectType === 'bag') {
-                    if (!cachedBagNoiseBuffer) buildBagNoiseBuffer();
-                    if (cachedBagNoiseBuffer) {
+                    if (bagNoiseBuffer) {
                         const noise = audioCtx.createBufferSource();
-                        noise.buffer = cachedBagNoiseBuffer;
+                        noise.buffer = bagNoiseBuffer;
 
                         const filter = audioCtx.createBiquadFilter();
                         filter.type = 'bandpass';
@@ -483,7 +483,7 @@
     }
 
     // =========================================================
-    // КОНФИГУРАЦИЯ УРОВНЕЙ (ОРИГИНАЛЬНАЯ СКОРОСТЬ КАК НА iPhone 13 Pro)
+    // КОНФИГУРАЦИЯ УРОВНЕЙ (ОРИГИНАЛЬНАЯ СКОРОСТЬ СОХРАНЕНА)
     // =========================================================
     const levels = {
         1: {
@@ -541,13 +541,13 @@
         level: 1,
         score: 0,
         lives: 3,
-        buttX: 200,
-        buttY: 100,
+        buttX: 200 * SCALE,
+        buttY: 100 * SCALE,
         buttDir: 1,
         buttAngle: 0,
-        basketX: 250,
-        basketWidth: 100,
-        basketHeight: 90,
+        basketX: 250 * SCALE,
+        basketWidth: 100 * SCALE,
+        basketHeight: 90 * SCALE,
         poops: [],
         particles: [],
         keys: {},
@@ -556,16 +556,13 @@
         isGameOver: false,
         evolutionTextTimer: 0,
         humanDirtyTimer: 0,
-        spawnElapsed: 0
+        spawnAccumulator: 0
     };
 
-    let animFrameId = null;
-    let lastFrameTime = 0;
-
     const clouds = [
-        { x: 60, y: 125, r: 34, speed: 0.35 },
-        { x: 320, y: 95, r: 42, speed: 0.25 },
-        { x: 510, y: 155, r: 28, speed: 0.45 }
+        { x: 60 * SCALE, y: 125 * SCALE, r: 34 * SCALE, speed: 0.35 * SCALE },
+        { x: 320 * SCALE, y: 95 * SCALE, r: 42 * SCALE, speed: 0.25 * SCALE },
+        { x: 510 * SCALE, y: 155 * SCALE, r: 28 * SCALE, speed: 0.45 * SCALE }
     ];
 
     let cachedRect = null;
@@ -604,7 +601,6 @@
     document.getElementById('retryBtn').addEventListener('click', resetGame);
     document.getElementById('winReplayBtn').addEventListener('click', resetGame);
     document.getElementById('nextQuestBtn').addEventListener('click', () => {
-        bgMusic.pause();
         if (window.parent !== window) {
             window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
         }
@@ -629,6 +625,9 @@
         Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
     });
 
+    let rafId = null;
+    let lastFrameTime = 0;
+
     function togglePause() {
         if (!state.isStarted || state.isGameOver) return;
         state.isPaused = !state.isPaused;
@@ -638,8 +637,8 @@
         } else {
             pauseBtn.textContent = '⏸️';
             pauseOverlay.classList.remove('active');
-            lastFrameTime = performance.now();
             updateCanvasRect();
+            lastFrameTime = performance.now();
         }
     }
 
@@ -654,18 +653,20 @@
     }
 
     function spawnPoop() {
+        if (!state.isStarted || state.isPaused || state.isGameOver || state.evolutionTextTimer > 0) return;
+        
         const lvlCfg = levels[state.level];
-        const baseSize = (12 + Math.random() * 8) * lvlCfg.poopSizeMultiplier;
+        const baseSize = (12 + Math.random() * 8) * lvlCfg.poopSizeMultiplier * SCALE;
         const stretchX = 0.85 + Math.random() * 0.4;
         const stretchY = 0.85 + Math.random() * 0.3;
 
-        let spawnOffsetX = 50;
-        if (lvlCfg.buttType === 'elephant') spawnOffsetX = 40;
-        if (lvlCfg.buttType === 'dog') spawnOffsetX = 15;
+        let spawnOffsetX = 50 * SCALE;
+        if (lvlCfg.buttType === 'elephant') spawnOffsetX = 40 * SCALE;
+        if (lvlCfg.buttType === 'dog') spawnOffsetX = 15 * SCALE;
 
         state.poops.push({
             x: state.buttX + spawnOffsetX,
-            y: state.buttY + (lvlCfg.buttType === 'elephant' ? 60 : 35),
+            y: state.buttY + (lvlCfg.buttType === 'elephant' ? 60 * SCALE : 35 * SCALE),
             radius: baseSize,
             scaleX: stretchX,
             scaleY: stretchY,
@@ -674,24 +675,25 @@
     }
 
     function spawnParticles(x, y, color, count = 8) {
-        if (state.particles.length > 70) return;
+        if (state.particles.length > 60) return;
         for (let i = 0; i < count; i++) {
             state.particles.push({
                 x: x, y: y,
-                vx: (Math.random() - 0.5) * 6,
-                vy: (Math.random() - 0.8) * 7,
-                radius: 2 + Math.random() * 4,
+                vx: (Math.random() - 0.5) * 6 * SCALE,
+                vy: (Math.random() - 0.8) * 7 * SCALE,
+                radius: (2 + Math.random() * 4) * SCALE,
                 alpha: 1,
                 color: color
             });
         }
     }
 
-    // ОТРИСОВКА ФОНА (НЕБО, ОБЛАКА И ГАЗОН)
     function drawBackground(stepFactor) {
+        // Небо
         ctx.fillStyle = skyGradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Облака
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         for (let i = 0; i < clouds.length; i++) {
             const c = clouds[i];
@@ -706,27 +708,31 @@
             ctx.fill();
         }
 
+        // Газон внизу
+        const grassH = 30 * SCALE;
+        const grassTopH = 8 * SCALE;
         ctx.fillStyle = '#10ac84';
-        ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+        ctx.fillRect(0, canvas.height - grassH, canvas.width, grassH);
         ctx.fillStyle = '#1dd1a1';
-        ctx.fillRect(0, canvas.height - 30, canvas.width, 8);
+        ctx.fillRect(0, canvas.height - grassH, canvas.width, grassTopH);
 
         ctx.fillStyle = '#0d8a6a';
-        for (let gx = 20; gx < canvas.width; gx += 48) {
+        for (let gx = 20 * SCALE; gx < canvas.width; gx += 48 * SCALE) {
             ctx.beginPath();
-            ctx.moveTo(gx, canvas.height - 22);
-            ctx.lineTo(gx - 5, canvas.height - 34);
-            ctx.lineTo(gx + 1, canvas.height - 22);
-            ctx.lineTo(gx + 6, canvas.height - 35);
-            ctx.lineTo(gx + 9, canvas.height - 22);
+            ctx.moveTo(gx, canvas.height - 22 * SCALE);
+            ctx.lineTo(gx - 5 * SCALE, canvas.height - 34 * SCALE);
+            ctx.lineTo(gx + 1 * SCALE, canvas.height - 22 * SCALE);
+            ctx.lineTo(gx + 6 * SCALE, canvas.height - 35 * SCALE);
+            ctx.lineTo(gx + 9 * SCALE, canvas.height - 22 * SCALE);
             ctx.fill();
         }
     }
 
-    function drawTopCreature(x, y, type, nowMs) {
+    function drawTopCreature(x, y, type) {
         ctx.save();
         ctx.translate(x, y);
-        state.buttAngle = Math.sin(nowMs * 0.008) * 0.12;
+        ctx.scale(SCALE, SCALE);
+        state.buttAngle = Math.sin(performance.now() * 0.008) * 0.12;
         
         if (type === 'dog') {
             ctx.translate(40, 20); 
@@ -781,92 +787,93 @@
     function drawPoop(poop) {
         ctx.save();
         ctx.translate(poop.x, poop.y);
-        const tilt = Math.sin(poop.wobble + poop.y * 0.03) * 0.08;
+        const tilt = Math.sin(poop.wobble + poop.y * 0.04) * 0.08;
         ctx.rotate(tilt);
         ctx.scale(poop.scaleX, poop.scaleY);
-        ctx.fillStyle = '#783e19'; ctx.strokeStyle = '#4a250f'; ctx.lineWidth = 2.5;
+        ctx.fillStyle = '#783e19'; ctx.strokeStyle = '#4a250f'; ctx.lineWidth = 2;
 
         const r = poop.radius;
-        ctx.beginPath(); ctx.ellipse(0, 10, r * 1.3, r * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.ellipse(0, -2, r * 1.05, r * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.ellipse(0, -12, r * 0.7, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-r * 0.3, -15); ctx.quadraticCurveTo(0, -28, r * 0.1, -25); ctx.quadraticCurveTo(0, -16, r * 0.3, -15); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, 10 * SCALE, r * 1.3, r * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -2 * SCALE, r * 1.05, r * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -12 * SCALE, r * 0.7, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-r * 0.3, -15 * SCALE); ctx.quadraticCurveTo(0, -28 * SCALE, r * 0.1, -25 * SCALE); ctx.quadraticCurveTo(0, -16 * SCALE, r * 0.3, -15 * SCALE); ctx.closePath(); ctx.fill(); ctx.stroke();
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-        ctx.beginPath(); ctx.ellipse(-r * 0.35, 8, r * 0.32, r * 0.16, -0.3, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(-r * 0.25, -3, r * 0.24, r * 0.13, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-r * 0.35, 8 * SCALE, r * 0.32, r * 0.16, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-r * 0.25, -3 * SCALE, r * 0.24, r * 0.13, -0.3, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
     }
 
-    function drawHunter(x, y, type, nowMs) {
+    function drawHunter(x, y, type) {
         ctx.save();
         const w = state.basketWidth;
         const h = state.basketHeight;
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.beginPath();
-        ctx.ellipse(x + w / 2, canvas.height - 20, w * 0.45, 7, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + w / 2, canvas.height - 20 * SCALE, w * 0.45, 7 * SCALE, 0, 0, Math.PI * 2);
         ctx.fill();
 
         if (type === 'bag') {
-            ctx.fillStyle = '#2d3436'; ctx.strokeStyle = '#000000'; ctx.lineWidth = 3;
+            ctx.fillStyle = '#2d3436'; ctx.strokeStyle = '#000000'; ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.moveTo(x + 10, y + 10); ctx.quadraticCurveTo(x, y + h, x + 20, y + h);
-            ctx.lineTo(x + w - 20, y + h); ctx.quadraticCurveTo(x + w, y + h, x + w - 10, y + 10);
+            ctx.moveTo(x + 10 * SCALE, y + 10 * SCALE); ctx.quadraticCurveTo(x, y + h, x + 20 * SCALE, y + h);
+            ctx.lineTo(x + w - 20 * SCALE, y + h); ctx.quadraticCurveTo(x + w, y + h, x + w - 10 * SCALE, y + 10 * SCALE);
             ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.beginPath(); ctx.arc(x + 18, y + 10, 10, Math.PI, 0); ctx.stroke();
-            ctx.beginPath(); ctx.arc(x + w - 18, y + 10, 10, Math.PI, 0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x + 18 * SCALE, y + 10 * SCALE, 10 * SCALE, Math.PI, 0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x + w - 18 * SCALE, y + 10 * SCALE, 10 * SCALE, Math.PI, 0); ctx.stroke();
         } 
         else if (type === 'pot') {
             let bodyGrad = ctx.createLinearGradient(x, y, x + w, y + h);
             bodyGrad.addColorStop(0, '#ff6b81'); bodyGrad.addColorStop(1, '#b31e33');
-            ctx.fillStyle = bodyGrad; ctx.strokeStyle = '#cc2e43'; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(x + 5, y + 15); ctx.quadraticCurveTo(x, y + h - 10, x + 15, y + h); ctx.lineTo(x + w - 15, y + h); ctx.quadraticCurveTo(x + w, y + h - 10, x + w - 5, y + 15); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#ff879b'; ctx.beginPath(); ctx.ellipse(x + w/2, y + 15, w/2, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(x + 22, y + h/2 + 5, 6, 22, Math.PI/10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = bodyGrad; ctx.strokeStyle = '#cc2e43'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(x + 5 * SCALE, y + 15 * SCALE); ctx.quadraticCurveTo(x, y + h - 10 * SCALE, x + 15 * SCALE, y + h); ctx.lineTo(x + w - 15 * SCALE, y + h); ctx.quadraticCurveTo(x + w, y + h - 10 * SCALE, x + w - 5 * SCALE, y + 15 * SCALE); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#ff879b'; ctx.beginPath(); ctx.ellipse(x + w/2, y + 15 * SCALE, w/2, 12 * SCALE, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(x + 22 * SCALE, y + h/2 + 5 * SCALE, 6 * SCALE, 22 * SCALE, Math.PI/10, 0, Math.PI*2); ctx.fill();
         } 
         else if (type === 'toilet') {
-            ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 4;
+            ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 3;
 
-            let tankGrad = ctx.createLinearGradient(x, y, x + 35, y + h);
+            let tankGrad = ctx.createLinearGradient(x, y, x + 35 * SCALE, y + h);
             tankGrad.addColorStop(0, '#ffffff'); tankGrad.addColorStop(1, '#b2bec3');
             ctx.fillStyle = tankGrad;
-            ctx.fillRect(x, y - 20, 35, 75); ctx.strokeRect(x, y - 20, 35, 75);
+            ctx.fillRect(x, y - 20 * SCALE, 35 * SCALE, 75 * SCALE); ctx.strokeRect(x, y - 20 * SCALE, 35 * SCALE, 75 * SCALE);
 
             ctx.fillStyle = '#bdc3c7';
-            ctx.beginPath(); ctx.arc(x + 17, y - 10, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x + 17 * SCALE, y - 10 * SCALE, 5 * SCALE, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
-            let footGrad = ctx.createLinearGradient(x + 35, y + 50, x + w, y + h);
+            let footGrad = ctx.createLinearGradient(x + 35 * SCALE, y + 50 * SCALE, x + w, y + h);
             footGrad.addColorStop(0, '#ffffff'); footGrad.addColorStop(1, '#bdc3c7');
             ctx.fillStyle = footGrad;
-            ctx.fillRect(x + 45, y + 55, w - 60, h - 55); ctx.strokeRect(x + 45, y + 55, w - 60, h - 55);
+            ctx.fillRect(x + 45 * SCALE, y + 55 * SCALE, w - 60 * SCALE, h - 55 * SCALE); ctx.strokeRect(x + 45 * SCALE, y + 55 * SCALE, w - 60 * SCALE, h - 55 * SCALE);
 
-            let bowlGrad = ctx.createLinearGradient(x + 35, y + 15, x + w, y + 60);
+            let bowlGrad = ctx.createLinearGradient(x + 35 * SCALE, y + 15 * SCALE, x + w, y + 60 * SCALE);
             bowlGrad.addColorStop(0, '#ffffff'); bowlGrad.addColorStop(0.5, '#f5f6fa'); bowlGrad.addColorStop(1, '#7f8c8d');
             ctx.fillStyle = bowlGrad;
             ctx.beginPath();
-            ctx.moveTo(x + 35, y + 15); ctx.quadraticCurveTo(x + 40, y + 58, x + 60, y + 58);
-            ctx.lineTo(x + w - 15, y + 58); ctx.quadraticCurveTo(x + w, y + 58, x + w, y + 15);
+            ctx.moveTo(x + 35 * SCALE, y + 15 * SCALE); ctx.quadraticCurveTo(x + 40 * SCALE, y + 58 * SCALE, x + 60 * SCALE, y + 58 * SCALE);
+            ctx.lineTo(x + w - 15 * SCALE, y + 58 * SCALE); ctx.quadraticCurveTo(x + w, y + 58 * SCALE, x + w, y + 15 * SCALE);
             ctx.closePath(); ctx.fill(); ctx.stroke();
 
             ctx.fillStyle = '#48dbfb';
-            ctx.beginPath(); ctx.ellipse(x + 35 + (w - 35) / 2, y + 30, (w - 45) / 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x + 35 * SCALE + (w - 35 * SCALE) / 2, y + 30 * SCALE, (w - 45 * SCALE) / 2, 8 * SCALE, 0, 0, Math.PI * 2); ctx.fill();
 
-            let seatGrad = ctx.createLinearGradient(x + 35, y + 15, x + w, y + 15);
+            let seatGrad = ctx.createLinearGradient(x + 35 * SCALE, y + 15 * SCALE, x + w, y + 15 * SCALE);
             seatGrad.addColorStop(0, '#ffffff'); seatGrad.addColorStop(1, '#b2bec3');
             ctx.fillStyle = seatGrad;
-            ctx.beginPath(); ctx.ellipse(x + 35 + (w - 35) / 2, y + 15, (w - 35) / 2, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(x + 35 * SCALE + (w - 35 * SCALE) / 2, y + 15 * SCALE, (w - 35 * SCALE) / 2, 12 * SCALE, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
-            ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(x + 45, y + 26, 6, 14);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(x + 45 * SCALE, y + 26 * SCALE, 6 * SCALE, 14 * SCALE);
         } 
         else if (type === 'human') {
             ctx.translate(x + w/2, y + h/2);
+            ctx.scale(SCALE, SCALE);
             let skinColor = state.humanDirtyTimer > 0 ? '#783e19' : '#ffcca3';
             let clothColor = state.humanDirtyTimer > 0 ? '#5c2d0c' : '#3498db';
 
             ctx.strokeStyle = skinColor; ctx.lineWidth = 5; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(-25, -25); ctx.moveTo(15, 0); ctx.lineTo(25, -25); ctx.stroke();
-            let legAnim = Math.sin(nowMs * 0.02) * 15;
+            let legAnim = Math.sin(performance.now() * 0.02) * 15;
             ctx.beginPath(); ctx.moveTo(-8, 20); ctx.lineTo(-12 + legAnim, 40); ctx.moveTo(8, 20); ctx.lineTo(12 - legAnim, 40); ctx.stroke();
             ctx.fillStyle = clothColor; ctx.fillRect(-12, -10, 24, 30);
             ctx.fillStyle = skinColor; ctx.beginPath(); ctx.arc(0, -22, 12, 0, Math.PI*2); ctx.fill();
@@ -876,38 +883,40 @@
         ctx.restore();
     }
 
-    // ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ КАДРОВ (СТАБИЛЬНЫЙ ПО ВРЕМЕНИ ДЛЯ iPhone X И ANDROID)
-    function update(nowMs) {
-        if (!state.isStarted || state.isGameOver) return;
-
-        if (state.isPaused) {
-            lastFrameTime = nowMs;
-            animFrameId = requestAnimationFrame(update);
+    function update(now) {
+        if (!state.isStarted || state.isGameOver) {
+            rafId = null;
             return;
         }
 
-        // Расчёт шага времени: при 60 FPS stepFactor = 1.0 (как на iPhone 13 Pro),
-        // а при просадках FPS на iPhone X / слабых Android скорость не падает
-        const dtMs = Math.min(nowMs - lastFrameTime, 50);
-        lastFrameTime = nowMs;
-        const stepFactor = dtMs / (1000 / 60);
+        if (!now) now = performance.now();
+        const rawDtMs = now - lastFrameTime;
+        lastFrameTime = now;
+        const dtMs = Math.min(Math.max(rawDtMs, 1), 66.6);
+        const stepFactor = (dtMs / 1000) * 60;
+
+        if (state.isPaused) {
+            rafId = requestAnimationFrame(update);
+            return;
+        }
 
         drawBackground(stepFactor);
 
         const lvlCfg = levels[state.level];
 
-        // Синхронный спавн какашек без setInterval
+        // Синхронный спавн какашек внутри цикла кадров
         if (state.evolutionTextTimer <= 0) {
-            state.spawnElapsed += dtMs;
-            if (state.spawnElapsed >= lvlCfg.spawnInterval) {
-                state.spawnElapsed %= lvlCfg.spawnInterval;
+            state.spawnAccumulator += dtMs;
+            if (state.spawnAccumulator >= lvlCfg.spawnInterval) {
+                state.spawnAccumulator -= lvlCfg.spawnInterval;
+                if (state.spawnAccumulator > lvlCfg.spawnInterval) state.spawnAccumulator = 0;
                 spawnPoop();
             }
         }
 
         // 1. Движение существа сверху
-        state.buttX += lvlCfg.buttSpeed * state.buttDir * stepFactor;
-        const creatureWidth = lvlCfg.buttType === 'elephant' ? 160 : 100;
+        state.buttX += lvlCfg.buttSpeed * SCALE * state.buttDir * stepFactor;
+        const creatureWidth = (lvlCfg.buttType === 'elephant' ? 160 : 100) * SCALE;
 
         if (state.buttX <= 0) {
             state.buttX = 0;
@@ -918,27 +927,27 @@
         }
 
         // 2. Движение клавиатурой
-        if (state.keys['ArrowLeft']) state.basketX -= 9 * stepFactor;
-        if (state.keys['ArrowRight']) state.basketX += 9 * stepFactor;
+        if (state.keys['ArrowLeft']) state.basketX -= 9 * SCALE * stepFactor;
+        if (state.keys['ArrowRight']) state.basketX += 9 * SCALE * stepFactor;
 
         if (lvlCfg.hunterType === 'toilet') {
-            state.basketWidth = 140; state.basketHeight = 115;
+            state.basketWidth = 140 * SCALE; state.basketHeight = 115 * SCALE;
         } else if (lvlCfg.hunterType === 'human') {
-            state.basketWidth = 60; state.basketHeight = 80;
+            state.basketWidth = 60 * SCALE; state.basketHeight = 80 * SCALE;
         } else {
-            state.basketWidth = 100; state.basketHeight = 90;
+            state.basketWidth = 100 * SCALE; state.basketHeight = 90 * SCALE;
         }
 
         if (state.basketX < 0) state.basketX = 0;
         if (state.basketX > canvas.width - state.basketWidth) state.basketX = canvas.width - state.basketWidth;
 
-        const basketY = canvas.height - state.basketHeight - 20;
+        const basketY = canvas.height - state.basketHeight - 20 * SCALE;
 
         // 3. Отрисовка существа и ловца
-        drawTopCreature(state.buttX, state.buttY, lvlCfg.buttType, nowMs);
+        drawTopCreature(state.buttX, state.buttY, lvlCfg.buttType);
         
         if (!isNaN(state.basketX) && isFinite(state.basketX)) {
-            drawHunter(state.basketX, basketY, lvlCfg.hunterType, nowMs);
+            drawHunter(state.basketX, basketY, lvlCfg.hunterType);
         }
 
         if (state.evolutionTextTimer > 0) state.evolutionTextTimer = Math.max(0, state.evolutionTextTimer - stepFactor);
@@ -947,11 +956,11 @@
         // 4. Логика падения, ловли и уклонения
         for (let i = state.poops.length - 1; i >= 0; i--) {
             let p = state.poops[i];
-            p.y += lvlCfg.poopSpeed * stepFactor;
+            p.y += lvlCfg.poopSpeed * SCALE * stepFactor;
 
             drawPoop(p);
 
-            if (p.y + p.radius >= basketY && p.y - p.radius <= basketY + 30) {
+            if (p.y + p.radius >= basketY && p.y - p.radius <= basketY + 30 * SCALE) {
                 const horizontalRadius = p.radius * p.scaleX;
                 
                 if (!isNaN(state.basketX) && p.x + horizontalRadius >= state.basketX && p.x - horizontalRadius <= state.basketX + state.basketWidth) {
@@ -970,22 +979,22 @@
                         state.humanDirtyTimer = 45;
                         playSynthEffect('splat_hit');
                         triggerHaptic([60, 40, 80]);
-                        spawnParticles(p.x, basketY + 20, '#783e19', 15);
+                        spawnParticles(p.x, basketY + 20 * SCALE, '#783e19', 15);
                         handleLifeLoss();
                     }
                     continue;
                 }
             }
 
-            if (p.y > canvas.height - 25) {
+            if (p.y > canvas.height - 25 * SCALE) {
                 if (lvlCfg.action === "dodge" && !p.groundSplatted) {
                     p.groundSplatted = true;
                     playSynthEffect('splat_ground');
-                    spawnParticles(p.x, canvas.height - 28, '#783e19', 8);
+                    spawnParticles(p.x, canvas.height - 28 * SCALE, '#783e19', 8);
                 }
             }
 
-            if (p.y > canvas.height + 40) {
+            if (p.y > canvas.height + 40 * SCALE) {
                 state.poops.splice(i, 1);
                 
                 if (lvlCfg.action === "catch") {
@@ -1003,7 +1012,7 @@
             let pt = state.particles[i];
             pt.x += pt.vx * stepFactor;
             pt.y += pt.vy * stepFactor;
-            pt.vy += 0.25 * stepFactor; 
+            pt.vy += 0.25 * SCALE * stepFactor;
             pt.alpha -= 0.02 * stepFactor;
             
             if (pt.alpha <= 0) {
@@ -1020,37 +1029,35 @@
 
         // 6. ОТРИСОВКА ИНТЕРФЕЙСА (БЕЗ СТАТИСТИКИ СПРАВА)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-        ctx.fillRect(0, 0, canvas.width, 68);
+        ctx.fillRect(0, 0, canvas.width, 68 * SCALE);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = '20px Arial Black, sans-serif';
+        ctx.font = `bold ${Math.round(20 * SCALE)}px Arial Black, sans-serif`;
         const topText = lvlCfg.action === "dodge" ? `${lvlCfg.nameTop}` : `${lvlCfg.name}`;
-        ctx.fillText(topText, 15, 42);
+        ctx.fillText(topText, 15 * SCALE, 42 * SCALE);
 
-        // Жизни
-        ctx.font = '24px Arial, sans-serif';
+        ctx.font = `${Math.round(24 * SCALE)}px Arial, sans-serif`;
         let livesStr = "";
         for (let l = 0; l < state.lives; l++) {
             livesStr += lvlCfg.lifeIcon + " ";
         }
-        ctx.fillText(livesStr, 15, 102);
+        ctx.fillText(livesStr, 15 * SCALE, 102 * SCALE);
 
-        // Заставка нового уровня
         if (state.evolutionTextTimer > 0) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-            ctx.fillRect(0, 300, canvas.width, 150);
+            ctx.fillRect(0, 300 * SCALE, canvas.width, 150 * SCALE);
             
             ctx.fillStyle = '#fdcb6e';
-            ctx.font = '32px Arial Black, sans-serif';
+            ctx.font = `bold ${Math.round(32 * SCALE)}px Arial Black, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText("НОВЫЙ УРОВЕНЬ!", canvas.width / 2, 365);
+            ctx.fillText("НОВЫЙ УРОВЕНЬ!", canvas.width / 2, 365 * SCALE);
             ctx.fillStyle = '#ffffff';
-            ctx.font = '22px Arial Black, sans-serif';
-            ctx.fillText(lvlCfg.name, canvas.width / 2, 415);
+            ctx.font = `bold ${Math.round(22 * SCALE)}px Arial Black, sans-serif`;
+            ctx.fillText(lvlCfg.name, canvas.width / 2, 415 * SCALE);
             ctx.textAlign = 'left'; 
         }
 
-        animFrameId = requestAnimationFrame(update);
+        rafId = requestAnimationFrame(update);
     }
 
     function handleScore() {
@@ -1064,12 +1071,12 @@
                 state.level++;
                 state.score = 0;
                 state.poops = [];
-                state.spawnElapsed = 0;
-                state.evolutionTextTimer = 90; 
+                state.evolutionTextTimer = 90;
+                state.spawnAccumulator = 0;
                 
                 playSoundHybrid('levelup', 0.65);
                 triggerHaptic([40, 30, 60]);
-                spawnParticles(canvas.width / 2, canvas.height / 2, '#f1c40f', 40);
+                spawnParticles(canvas.width / 2, canvas.height / 2, '#f1c40f', 35);
             } else {
                 state.isGameOver = true;
                 playSoundHybrid('win', 0.8);
@@ -1099,9 +1106,9 @@
     }
 
     function resetGame() {
-        if (animFrameId) {
-            cancelAnimationFrame(animFrameId);
-            animFrameId = null;
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
         }
 
         state.level = 1;
@@ -1109,12 +1116,12 @@
         state.lives = 3;
         state.poops = [];
         state.particles = [];
-        state.buttX = 200;
-        state.basketX = 250;
-        state.basketWidth = 100;
-        state.basketHeight = 90;
-        state.evolutionTextTimer = 90; 
-        state.spawnElapsed = 0;
+        state.buttX = 200 * SCALE;
+        state.basketX = 250 * SCALE;
+        state.basketWidth = 100 * SCALE;
+        state.basketHeight = 90 * SCALE;
+        state.evolutionTextTimer = 90;
+        state.spawnAccumulator = 0;
         state.isPaused = false;
         state.isGameOver = false;
         pauseBtn.textContent = '⏸️';
@@ -1125,19 +1132,8 @@
 
         updateCanvasRect();
         lastFrameTime = performance.now();
-        animFrameId = requestAnimationFrame(update);
+        rafId = requestAnimationFrame(update);
     }
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            bgMusic.pause();
-        } else {
-            lastFrameTime = performance.now();
-            if (isMusicEnabled && isMusicStarted && !state.isGameOver) {
-                startBgMusic();
-            }
-        }
-    });
 
     updateCanvasRect();
 </script>
