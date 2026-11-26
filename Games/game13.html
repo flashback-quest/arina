@@ -27,12 +27,12 @@
             align-items: center;
         }
         canvas {
-            background: linear-gradient(to bottom, #6bb9f0, #9b8df2);
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            background: #6bb9f0;
             max-width: 100%;
             max-height: 100%;
             touch-action: none;
             display: block;
+            transform: translateZ(0);
         }
 
         /* Кнопки управления (Пауза и Звук) */
@@ -179,7 +179,7 @@
 
 <script>
     const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     const startOverlay = document.getElementById('startOverlay');
     const pauseOverlay = document.getElementById('pauseOverlay');
     const winOverlay = document.getElementById('winOverlay');
@@ -189,13 +189,18 @@
     const muteBtn = document.getElementById('muteBtn');
     const musicBtn = document.getElementById('musicBtn');
 
+    // Предварительно созданный градиент неба (вместо перерисовки средствами CSS)
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGradient.addColorStop(0, '#6bb9f0');
+    skyGradient.addColorStop(1, '#9b8df2');
+
     // =========================================================
     // ФОНОВАЯ МУЗЫКА
     // =========================================================
     const bgMusic = new Audio('../music/posol_fon_kakahi.mp3');
     bgMusic.loop = true;
     bgMusic.volume = 0.35;
-    bgMusic.preload = 'auto';
+    bgMusic.preload = 'none';
 
     let isMusicEnabled = true;
     let isMusicStarted = false;
@@ -223,7 +228,7 @@
     }
 
     // =========================================================
-    // ГИБРИДНАЯ СИСТЕМА ЗВУКА + СИНТЕЗАТОР ЭФФЕКТОВ ПАДЕНИЯ
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА + ПРЕДРАССЧИТАННЫЙ БУФЕР ШУМА
     // =========================================================
     const soundFiles = {
         miss: '../sounds/krestik2.mp3',
@@ -239,6 +244,7 @@
     const isLocalFile = window.location.protocol === 'file:';
     let isAudioUnlocked = false;
     let isMuted = false;
+    let cachedBagNoiseBuffer = null;
 
     Object.keys(soundFiles).forEach(key => {
         const a = new Audio(soundFiles[key]);
@@ -258,6 +264,20 @@
         }
     }
 
+    function buildBagNoiseBuffer() {
+        if (!audioCtx || cachedBagNoiseBuffer) return;
+        try {
+            const dur = 0.14;
+            const bufSize = Math.floor(audioCtx.sampleRate * dur);
+            const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+            const data = noiseBuf.getChannelData(0);
+            for (let i = 0; i < bufSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
+            }
+            cachedBagNoiseBuffer = noiseBuf;
+        } catch (e) {}
+    }
+
     function unlockAudioEngine() {
         if (!audioCtx && AudioCtx) {
             try { audioCtx = new AudioCtx(); } catch (e) {}
@@ -274,6 +294,7 @@
                 source.connect(audioCtx.destination);
                 source.start(0);
             } catch (e) {}
+            buildBagNoiseBuffer();
             Object.keys(soundFiles).forEach(key => loadSoundBuffer(key, soundFiles[key]));
         }
         if (isMusicEnabled && !isMusicStarted) {
@@ -322,7 +343,6 @@
         }
     }
 
-    // --- ВСТРОЕННЫЙ СИНТЕЗАТОР ЗВУКОВ ПАДЕНИЯ И ПОПАДАНИЯ ---
     function playSynthEffect(effectType) {
         if (isMuted) return;
         unlockAudioEngine();
@@ -333,32 +353,26 @@
                 const now = audioCtx.currentTime;
 
                 if (effectType === 'bag') {
-                    // Уровень 1: Шуршащий шлёп в пакет (шумовой импульс + мягкий низкий шлепок)
-                    const dur = 0.14;
-                    const bufSize = Math.floor(audioCtx.sampleRate * dur);
-                    const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-                    const data = noiseBuf.getChannelData(0);
-                    for (let i = 0; i < bufSize; i++) {
-                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
+                    if (!cachedBagNoiseBuffer) buildBagNoiseBuffer();
+                    if (cachedBagNoiseBuffer) {
+                        const noise = audioCtx.createBufferSource();
+                        noise.buffer = cachedBagNoiseBuffer;
+
+                        const filter = audioCtx.createBiquadFilter();
+                        filter.type = 'bandpass';
+                        filter.frequency.setValueAtTime(1800, now);
+                        filter.Q.value = 1.6;
+
+                        const gain = audioCtx.createGain();
+                        gain.gain.setValueAtTime(0.32, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+
+                        noise.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        noise.start(now);
                     }
-                    const noise = audioCtx.createBufferSource();
-                    noise.buffer = noiseBuf;
 
-                    const filter = audioCtx.createBiquadFilter();
-                    filter.type = 'bandpass';
-                    filter.frequency.setValueAtTime(1800, now);
-                    filter.Q.value = 1.6;
-
-                    const gain = audioCtx.createGain();
-                    gain.gain.setValueAtTime(0.32, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + dur);
-
-                    noise.connect(filter);
-                    filter.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    noise.start(now);
-
-                    // Мягкий глухой удар
                     const osc = audioCtx.createOscillator();
                     const oscGain = audioCtx.createGain();
                     osc.type = 'sine';
@@ -372,7 +386,6 @@
                     osc.stop(now + 0.1);
                 }
                 else if (effectType === 'pot') {
-                    // Уровень 2: Гулкий пластиковый «тук» в горшок
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'triangle';
@@ -389,7 +402,6 @@
                     osc.stop(now + 0.16);
                 }
                 else if (effectType === 'toilet') {
-                    // Уровень 3: Сочный водный «плюх-бульк» в унитаз
                     const osc1 = audioCtx.createOscillator();
                     const gain1 = audioCtx.createGain();
                     osc1.type = 'sine';
@@ -405,7 +417,6 @@
                     osc1.start(now);
                     osc1.stop(now + 0.22);
 
-                    // Второй маленький пузырёк
                     const osc2 = audioCtx.createOscillator();
                     const gain2 = audioCtx.createGain();
                     osc2.type = 'sine';
@@ -421,7 +432,6 @@
                     osc2.stop(now + 0.25);
                 }
                 else if (effectType === 'splat_ground') {
-                    // Уровень 4: Тяжёлый глухой «шмяк» слоновьей лепёшки об землю
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'sine';
@@ -437,7 +447,6 @@
                     osc.stop(now + 0.25);
                 }
                 else if (effectType === 'splat_hit') {
-                    // Уровень 4: Мощный «шмяк» при попадании лепёшки в человечка
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'sawtooth';
@@ -474,7 +483,7 @@
     }
 
     // =========================================================
-    // КОНФИГУРАЦИЯ УРОВНЕЙ (ОРИГИНАЛЬНАЯ СКОРОСТЬ СОХРАНЕНА)
+    // КОНФИГУРАЦИЯ УРОВНЕЙ (ОРИГИНАЛЬНАЯ СКОРОСТЬ КАК НА iPhone 13 Pro)
     // =========================================================
     const levels = {
         1: {
@@ -546,17 +555,19 @@
         isPaused: false,
         isGameOver: false,
         evolutionTextTimer: 0,
-        humanDirtyTimer: 0
+        humanDirtyTimer: 0,
+        spawnElapsed: 0
     };
 
-    // Лёгкие облака для улучшения фона без нагрузки на GPU
+    let animFrameId = null;
+    let lastFrameTime = 0;
+
     const clouds = [
         { x: 60, y: 125, r: 34, speed: 0.35 },
         { x: 320, y: 95, r: 42, speed: 0.25 },
         { x: 510, y: 155, r: 28, speed: 0.45 }
     ];
 
-    // Кэширование геометрии холста для плавного управления пальцем
     let cachedRect = null;
     function updateCanvasRect() {
         cachedRect = canvas.getBoundingClientRect();
@@ -564,7 +575,6 @@
     window.addEventListener('resize', updateCanvasRect);
     window.addEventListener('orientationchange', () => setTimeout(updateCanvasRect, 120));
 
-    // Слушатели управления
     window.addEventListener('keydown', e => {
         if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
             togglePause();
@@ -589,12 +599,12 @@
     }, { passive: false });
     canvas.addEventListener('pointermove', handlePointer, { passive: false });
 
-    // Кнопки интерфейса
     document.getElementById('startBtn').addEventListener('click', startGame);
     document.getElementById('resumeBtn').addEventListener('click', togglePause);
     document.getElementById('retryBtn').addEventListener('click', resetGame);
     document.getElementById('winReplayBtn').addEventListener('click', resetGame);
     document.getElementById('nextQuestBtn').addEventListener('click', () => {
+        bgMusic.pause();
         if (window.parent !== window) {
             window.parent.postMessage({ type: 'QUEST_WIN' }, '*');
         }
@@ -628,6 +638,7 @@
         } else {
             pauseBtn.textContent = '⏸️';
             pauseOverlay.classList.remove('active');
+            lastFrameTime = performance.now();
             updateCanvasRect();
         }
     }
@@ -642,17 +653,7 @@
         resetGame();
     }
 
-    // Система генерации какашек
-    let spawnTimer = null;
-
-    function restartSpawnTimer() {
-        if (spawnTimer) clearInterval(spawnTimer);
-        spawnTimer = setInterval(spawnPoop, levels[state.level].spawnInterval);
-    }
-
     function spawnPoop() {
-        if (!state.isStarted || state.isPaused || state.isGameOver || state.evolutionTextTimer > 0) return;
-        
         const lvlCfg = levels[state.level];
         const baseSize = (12 + Math.random() * 8) * lvlCfg.poopSizeMultiplier;
         const stretchX = 0.85 + Math.random() * 0.4;
@@ -673,6 +674,7 @@
     }
 
     function spawnParticles(x, y, color, count = 8) {
+        if (state.particles.length > 70) return;
         for (let i = 0; i < count; i++) {
             state.particles.push({
                 x: x, y: y,
@@ -685,13 +687,16 @@
         }
     }
 
-    // ОТРИСОВКА ФОНА (ОБЛАКА И ГАЗОН)
-    function drawBackground() {
+    // ОТРИСОВКА ФОНА (НЕБО, ОБЛАКА И ГАЗОН)
+    function drawBackground(stepFactor) {
+        ctx.fillStyle = skyGradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         for (let i = 0; i < clouds.length; i++) {
             const c = clouds[i];
             if (state.isStarted && !state.isPaused && !state.isGameOver) {
-                c.x += c.speed;
+                c.x += c.speed * stepFactor;
                 if (c.x - c.r * 2 > canvas.width) c.x = -c.r * 2;
             }
             ctx.beginPath();
@@ -701,13 +706,11 @@
             ctx.fill();
         }
 
-        // Газон внизу
         ctx.fillStyle = '#10ac84';
         ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
         ctx.fillStyle = '#1dd1a1';
         ctx.fillRect(0, canvas.height - 30, canvas.width, 8);
 
-        // Декоративные пучки травы
         ctx.fillStyle = '#0d8a6a';
         for (let gx = 20; gx < canvas.width; gx += 48) {
             ctx.beginPath();
@@ -720,11 +723,10 @@
         }
     }
 
-    // ОТРИСОВКА СУЩЕСТВ СВЕРХУ
-    function drawTopCreature(x, y, type) {
+    function drawTopCreature(x, y, type, nowMs) {
         ctx.save();
         ctx.translate(x, y);
-        state.buttAngle = Math.sin(Date.now() * 0.008) * 0.12;
+        state.buttAngle = Math.sin(nowMs * 0.008) * 0.12;
         
         if (type === 'dog') {
             ctx.translate(40, 20); 
@@ -776,7 +778,6 @@
         ctx.restore();
     }
 
-    // ОТРИСОВКА КАКАШЕК С БЛИКОМ И ЛЁГКИМ ПОКАЧИВАНИЕМ
     function drawPoop(poop) {
         ctx.save();
         ctx.translate(poop.x, poop.y);
@@ -791,20 +792,17 @@
         ctx.beginPath(); ctx.ellipse(0, -12, r * 0.7, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-r * 0.3, -15); ctx.quadraticCurveTo(0, -28, r * 0.1, -25); ctx.quadraticCurveTo(0, -16, r * 0.3, -15); ctx.closePath(); ctx.fill(); ctx.stroke();
 
-        // Светлый блик для объёма
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         ctx.beginPath(); ctx.ellipse(-r * 0.35, 8, r * 0.32, r * 0.16, -0.3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-r * 0.25, -3, r * 0.24, r * 0.13, -0.3, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
     }
 
-    // ОТРИСОВКА ЛОВЦА И ТЕНИ ПОД НИМ
-    function drawHunter(x, y, type) {
+    function drawHunter(x, y, type, nowMs) {
         ctx.save();
         const w = state.basketWidth;
         const h = state.basketHeight;
 
-        // Тень на траве под ловцом
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.beginPath();
         ctx.ellipse(x + w / 2, canvas.height - 20, w * 0.45, 7, 0, 0, Math.PI * 2);
@@ -868,7 +866,7 @@
 
             ctx.strokeStyle = skinColor; ctx.lineWidth = 5; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(-25, -25); ctx.moveTo(15, 0); ctx.lineTo(25, -25); ctx.stroke();
-            let legAnim = Math.sin(Date.now() * 0.02) * 15;
+            let legAnim = Math.sin(nowMs * 0.02) * 15;
             ctx.beginPath(); ctx.moveTo(-8, 20); ctx.lineTo(-12 + legAnim, 40); ctx.moveTo(8, 20); ctx.lineTo(12 - legAnim, 40); ctx.stroke();
             ctx.fillStyle = clothColor; ctx.fillRect(-12, -10, 24, 30);
             ctx.fillStyle = skinColor; ctx.beginPath(); ctx.arc(0, -22, 12, 0, Math.PI*2); ctx.fill();
@@ -878,22 +876,37 @@
         ctx.restore();
     }
 
-    // ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ КАДРОВ (ОРИГИНАЛЬНАЯ СКОРОСТЬ)
-    function update() {
+    // ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ КАДРОВ (СТАБИЛЬНЫЙ ПО ВРЕМЕНИ ДЛЯ iPhone X И ANDROID)
+    function update(nowMs) {
         if (!state.isStarted || state.isGameOver) return;
 
         if (state.isPaused) {
-            requestAnimationFrame(update);
+            lastFrameTime = nowMs;
+            animFrameId = requestAnimationFrame(update);
             return;
         }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawBackground();
+        // Расчёт шага времени: при 60 FPS stepFactor = 1.0 (как на iPhone 13 Pro),
+        // а при просадках FPS на iPhone X / слабых Android скорость не падает
+        const dtMs = Math.min(nowMs - lastFrameTime, 50);
+        lastFrameTime = nowMs;
+        const stepFactor = dtMs / (1000 / 60);
+
+        drawBackground(stepFactor);
 
         const lvlCfg = levels[state.level];
 
+        // Синхронный спавн какашек без setInterval
+        if (state.evolutionTextTimer <= 0) {
+            state.spawnElapsed += dtMs;
+            if (state.spawnElapsed >= lvlCfg.spawnInterval) {
+                state.spawnElapsed %= lvlCfg.spawnInterval;
+                spawnPoop();
+            }
+        }
+
         // 1. Движение существа сверху
-        state.buttX += lvlCfg.buttSpeed * state.buttDir;
+        state.buttX += lvlCfg.buttSpeed * state.buttDir * stepFactor;
         const creatureWidth = lvlCfg.buttType === 'elephant' ? 160 : 100;
 
         if (state.buttX <= 0) {
@@ -905,8 +918,8 @@
         }
 
         // 2. Движение клавиатурой
-        if (state.keys['ArrowLeft']) state.basketX -= 9;
-        if (state.keys['ArrowRight']) state.basketX += 9;
+        if (state.keys['ArrowLeft']) state.basketX -= 9 * stepFactor;
+        if (state.keys['ArrowRight']) state.basketX += 9 * stepFactor;
 
         if (lvlCfg.hunterType === 'toilet') {
             state.basketWidth = 140; state.basketHeight = 115;
@@ -922,19 +935,19 @@
         const basketY = canvas.height - state.basketHeight - 20;
 
         // 3. Отрисовка существа и ловца
-        drawTopCreature(state.buttX, state.buttY, lvlCfg.buttType);
+        drawTopCreature(state.buttX, state.buttY, lvlCfg.buttType, nowMs);
         
         if (!isNaN(state.basketX) && isFinite(state.basketX)) {
-            drawHunter(state.basketX, basketY, lvlCfg.hunterType);
+            drawHunter(state.basketX, basketY, lvlCfg.hunterType, nowMs);
         }
 
-        if (state.evolutionTextTimer > 0) state.evolutionTextTimer--;
-        if (state.humanDirtyTimer > 0) state.humanDirtyTimer--;
+        if (state.evolutionTextTimer > 0) state.evolutionTextTimer = Math.max(0, state.evolutionTextTimer - stepFactor);
+        if (state.humanDirtyTimer > 0) state.humanDirtyTimer = Math.max(0, state.humanDirtyTimer - stepFactor);
 
         // 4. Логика падения, ловли и уклонения
         for (let i = state.poops.length - 1; i >= 0; i--) {
             let p = state.poops[i];
-            p.y += lvlCfg.poopSpeed;
+            p.y += lvlCfg.poopSpeed * stepFactor;
 
             drawPoop(p);
 
@@ -949,13 +962,11 @@
                         if (lvlCfg.hunterType === 'pot') particleColor = '#ff6b81';
                         if (lvlCfg.hunterType === 'toilet') particleColor = '#48dbfb'; 
                         
-                        // Звук падения в пакет, горшок или унитаз!
                         playSynthEffect(lvlCfg.hunterType);
                         triggerHaptic(20);
                         spawnParticles(p.x, basketY, particleColor, 10);
                         handleScore();
                     } else {
-                        // Попадание слоновьей лепёшки в человека!
                         state.humanDirtyTimer = 45;
                         playSynthEffect('splat_hit');
                         triggerHaptic([60, 40, 80]);
@@ -966,10 +977,8 @@
                 }
             }
 
-            // Какашка или лепёшка упала на газон
             if (p.y > canvas.height - 25) {
                 if (lvlCfg.action === "dodge" && !p.groundSplatted) {
-                    // Звук и брызги при падении лепёшки на землю на 4 уровне
                     p.groundSplatted = true;
                     playSynthEffect('splat_ground');
                     spawnParticles(p.x, canvas.height - 28, '#783e19', 8);
@@ -992,19 +1001,24 @@
         // 5. Отрисовка частиц
         for (let i = state.particles.length - 1; i >= 0; i--) {
             let pt = state.particles[i];
-            pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.25; 
-            pt.alpha -= 0.02;
+            pt.x += pt.vx * stepFactor;
+            pt.y += pt.vy * stepFactor;
+            pt.vy += 0.25 * stepFactor; 
+            pt.alpha -= 0.02 * stepFactor;
             
+            if (pt.alpha <= 0) {
+                state.particles.splice(i, 1);
+                continue;
+            }
+
             ctx.save();
             ctx.globalAlpha = pt.alpha;
             ctx.fillStyle = pt.color;
             ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI*2); ctx.fill();
             ctx.restore();
-
-            if (pt.alpha <= 0) state.particles.splice(i, 1);
         }
 
-        // 6. ОТРИСОВКА ИНТЕРФЕЙСА
+        // 6. ОТРИСОВКА ИНТЕРФЕЙСА (БЕЗ СТАТИСТИКИ СПРАВА)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.fillRect(0, 0, canvas.width, 68);
 
@@ -1012,10 +1026,6 @@
         ctx.font = '20px Arial Black, sans-serif';
         const topText = lvlCfg.action === "dodge" ? `${lvlCfg.nameTop}` : `${lvlCfg.name}`;
         ctx.fillText(topText, 15, 42);
-
-        ctx.fillStyle = '#fdcb6e';
-        const scoreText = lvlCfg.action === "dodge" ? `Увороты: ${state.score} / ${lvlCfg.targetScore}` : `Поймано: ${state.score} / ${lvlCfg.targetScore}`;
-        ctx.fillText(scoreText, canvas.width - 285, 42);
 
         // Жизни
         ctx.font = '24px Arial, sans-serif';
@@ -1040,7 +1050,7 @@
             ctx.textAlign = 'left'; 
         }
 
-        requestAnimationFrame(update);
+        animFrameId = requestAnimationFrame(update);
     }
 
     function handleScore() {
@@ -1054,16 +1064,14 @@
                 state.level++;
                 state.score = 0;
                 state.poops = [];
+                state.spawnElapsed = 0;
                 state.evolutionTextTimer = 90; 
                 
                 playSoundHybrid('levelup', 0.65);
                 triggerHaptic([40, 30, 60]);
                 spawnParticles(canvas.width / 2, canvas.height / 2, '#f1c40f', 40);
-
-                restartSpawnTimer();
             } else {
                 state.isGameOver = true;
-                if (spawnTimer) clearInterval(spawnTimer);
                 playSoundHybrid('win', 0.8);
                 triggerHaptic([100, 50, 100, 50, 200]);
                 winOverlay.classList.add('active');
@@ -1077,7 +1085,6 @@
         state.lives--;
         if (state.lives <= 0) {
             state.isGameOver = true;
-            if (spawnTimer) clearInterval(spawnTimer);
             playSoundHybrid('gameover', 0.75);
             triggerHaptic([150, 80, 200]);
             
@@ -1092,6 +1099,11 @@
     }
 
     function resetGame() {
+        if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+
         state.level = 1;
         state.score = 0;
         state.lives = 3;
@@ -1102,6 +1114,7 @@
         state.basketWidth = 100;
         state.basketHeight = 90;
         state.evolutionTextTimer = 90; 
+        state.spawnElapsed = 0;
         state.isPaused = false;
         state.isGameOver = false;
         pauseBtn.textContent = '⏸️';
@@ -1111,9 +1124,20 @@
         gameOverOverlay.classList.remove('active');
 
         updateCanvasRect();
-        restartSpawnTimer();
-        requestAnimationFrame(update);
+        lastFrameTime = performance.now();
+        animFrameId = requestAnimationFrame(update);
     }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            bgMusic.pause();
+        } else {
+            lastFrameTime = performance.now();
+            if (isMusicEnabled && isMusicStarted && !state.isGameOver) {
+                startBgMusic();
+            }
+        }
+    });
 
     updateCanvasRect();
 </script>
