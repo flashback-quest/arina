@@ -333,7 +333,6 @@
                 const now = audioCtx.currentTime;
 
                 if (effectType === 'bag') {
-                    // Уровень 1: Шуршащий шлёп в пакет (шумовой импульс + мягкий низкий шлепок)
                     const dur = 0.14;
                     const bufSize = Math.floor(audioCtx.sampleRate * dur);
                     const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
@@ -358,7 +357,6 @@
                     gain.connect(audioCtx.destination);
                     noise.start(now);
 
-                    // Мягкий глухой удар
                     const osc = audioCtx.createOscillator();
                     const oscGain = audioCtx.createGain();
                     osc.type = 'sine';
@@ -372,7 +370,6 @@
                     osc.stop(now + 0.1);
                 }
                 else if (effectType === 'pot') {
-                    // Уровень 2: Гулкий пластиковый «тук» в горшок
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'triangle';
@@ -389,7 +386,6 @@
                     osc.stop(now + 0.16);
                 }
                 else if (effectType === 'toilet') {
-                    // Уровень 3: Сочный водный «плюх-бульк» в унитаз
                     const osc1 = audioCtx.createOscillator();
                     const gain1 = audioCtx.createGain();
                     osc1.type = 'sine';
@@ -405,7 +401,6 @@
                     osc1.start(now);
                     osc1.stop(now + 0.22);
 
-                    // Второй маленький пузырёк
                     const osc2 = audioCtx.createOscillator();
                     const gain2 = audioCtx.createGain();
                     osc2.type = 'sine';
@@ -421,7 +416,6 @@
                     osc2.stop(now + 0.25);
                 }
                 else if (effectType === 'splat_ground') {
-                    // Уровень 4: Тяжёлый глухой «шмяк» слоновьей лепёшки об землю
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'sine';
@@ -437,7 +431,6 @@
                     osc.stop(now + 0.25);
                 }
                 else if (effectType === 'splat_hit') {
-                    // Уровень 4: Мощный «шмяк» при попадании лепёшки в человечка
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'sawtooth';
@@ -549,14 +542,12 @@
         humanDirtyTimer: 0
     };
 
-    // Лёгкие облака для улучшения фона без нагрузки на GPU
     const clouds = [
         { x: 60, y: 125, r: 34, speed: 0.35 },
         { x: 320, y: 95, r: 42, speed: 0.25 },
         { x: 510, y: 155, r: 28, speed: 0.45 }
     ];
 
-    // Кэширование геометрии холста для плавного управления пальцем
     let cachedRect = null;
     function updateCanvasRect() {
         cachedRect = canvas.getBoundingClientRect();
@@ -564,7 +555,6 @@
     window.addEventListener('resize', updateCanvasRect);
     window.addEventListener('orientationchange', () => setTimeout(updateCanvasRect, 120));
 
-    // Слушатели управления
     window.addEventListener('keydown', e => {
         if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
             togglePause();
@@ -589,7 +579,6 @@
     }, { passive: false });
     canvas.addEventListener('pointermove', handlePointer, { passive: false });
 
-    // Кнопки интерфейса
     document.getElementById('startBtn').addEventListener('click', startGame);
     document.getElementById('resumeBtn').addEventListener('click', togglePause);
     document.getElementById('retryBtn').addEventListener('click', resetGame);
@@ -642,7 +631,6 @@
         resetGame();
     }
 
-    // Система генерации какашек
     let spawnTimer = null;
 
     function restartSpawnTimer() {
@@ -685,7 +673,6 @@
         }
     }
 
-    // ОТРИСОВКА ФОНА (ОБЛАКА И ГАЗОН)
     function drawBackground() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         for (let i = 0; i < clouds.length; i++) {
@@ -701,13 +688,11 @@
             ctx.fill();
         }
 
-        // Газон внизу
         ctx.fillStyle = '#10ac84';
         ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
         ctx.fillStyle = '#1dd1a1';
         ctx.fillRect(0, canvas.height - 30, canvas.width, 8);
 
-        // Декоративные пучки травы
         ctx.fillStyle = '#0d8a6a';
         for (let gx = 20; gx < canvas.width; gx += 48) {
             ctx.beginPath();
@@ -720,7 +705,6 @@
         }
     }
 
-    // ОТРИСОВКА СУЩЕСТВ СВЕРХУ
     function drawTopCreature(x, y, type) {
         ctx.save();
         ctx.translate(x, y);
@@ -776,7 +760,6 @@
         ctx.restore();
     }
 
-    // ОТРИСОВКА КАКАШЕК С БЛИКОМ И ЛЁГКИМ ПОКАЧИВАНИЕМ
     function drawPoop(poop) {
         ctx.save();
         ctx.translate(poop.x, poop.y);
@@ -791,20 +774,17 @@
         ctx.beginPath(); ctx.ellipse(0, -12, r * 0.7, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-r * 0.3, -15); ctx.quadraticCurveTo(0, -28, r * 0.1, -25); ctx.quadraticCurveTo(0, -16, r * 0.3, -15); ctx.closePath(); ctx.fill(); ctx.stroke();
 
-        // Светлый блик для объёма
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         ctx.beginPath(); ctx.ellipse(-r * 0.35, 8, r * 0.32, r * 0.16, -0.3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-r * 0.25, -3, r * 0.24, r * 0.13, -0.3, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
     }
 
-    // ОТРИСОВКА ЛОВЦА И ТЕНИ ПОД НИМ
     function drawHunter(x, y, type) {
         ctx.save();
         const w = state.basketWidth;
         const h = state.basketHeight;
 
-        // Тень на траве под ловцом
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.beginPath();
         ctx.ellipse(x + w / 2, canvas.height - 20, w * 0.45, 7, 0, 0, Math.PI * 2);
@@ -878,12 +858,16 @@
         ctx.restore();
     }
 
-    // ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ КАДРОВ (ОРИГИНАЛЬНАЯ СКОРОСТЬ)
+    let rafId = null;
+
     function update() {
-        if (!state.isStarted || state.isGameOver) return;
+        if (!state.isStarted || state.isGameOver) {
+            rafId = null;
+            return;
+        }
 
         if (state.isPaused) {
-            requestAnimationFrame(update);
+            rafId = requestAnimationFrame(update);
             return;
         }
 
@@ -892,7 +876,6 @@
 
         const lvlCfg = levels[state.level];
 
-        // 1. Движение существа сверху
         state.buttX += lvlCfg.buttSpeed * state.buttDir;
         const creatureWidth = lvlCfg.buttType === 'elephant' ? 160 : 100;
 
@@ -904,7 +887,6 @@
             state.buttDir = -1;
         }
 
-        // 2. Движение клавиатурой
         if (state.keys['ArrowLeft']) state.basketX -= 9;
         if (state.keys['ArrowRight']) state.basketX += 9;
 
@@ -921,7 +903,6 @@
 
         const basketY = canvas.height - state.basketHeight - 20;
 
-        // 3. Отрисовка существа и ловца
         drawTopCreature(state.buttX, state.buttY, lvlCfg.buttType);
         
         if (!isNaN(state.basketX) && isFinite(state.basketX)) {
@@ -931,7 +912,6 @@
         if (state.evolutionTextTimer > 0) state.evolutionTextTimer--;
         if (state.humanDirtyTimer > 0) state.humanDirtyTimer--;
 
-        // 4. Логика падения, ловли и уклонения
         for (let i = state.poops.length - 1; i >= 0; i--) {
             let p = state.poops[i];
             p.y += lvlCfg.poopSpeed;
@@ -949,13 +929,11 @@
                         if (lvlCfg.hunterType === 'pot') particleColor = '#ff6b81';
                         if (lvlCfg.hunterType === 'toilet') particleColor = '#48dbfb'; 
                         
-                        // Звук падения в пакет, горшок или унитаз!
                         playSynthEffect(lvlCfg.hunterType);
                         triggerHaptic(20);
                         spawnParticles(p.x, basketY, particleColor, 10);
                         handleScore();
                     } else {
-                        // Попадание слоновьей лепёшки в человека!
                         state.humanDirtyTimer = 45;
                         playSynthEffect('splat_hit');
                         triggerHaptic([60, 40, 80]);
@@ -966,10 +944,8 @@
                 }
             }
 
-            // Какашка или лепёшка упала на газон
             if (p.y > canvas.height - 25) {
                 if (lvlCfg.action === "dodge" && !p.groundSplatted) {
-                    // Звук и брызги при падении лепёшки на землю на 4 уровне
                     p.groundSplatted = true;
                     playSynthEffect('splat_ground');
                     spawnParticles(p.x, canvas.height - 28, '#783e19', 8);
@@ -989,7 +965,6 @@
             }
         }
 
-        // 5. Отрисовка частиц
         for (let i = state.particles.length - 1; i >= 0; i--) {
             let pt = state.particles[i];
             pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.25; 
@@ -1004,7 +979,7 @@
             if (pt.alpha <= 0) state.particles.splice(i, 1);
         }
 
-        // 6. ОТРИСОВКА ИНТЕРФЕЙСА (БЕЗ СТАТИСТИКИ ПОЙМАННЫХ, ЧТОБЫ НЕ ПЕРЕКРЫВАЛАСЬ КНОПКАМИ)
+        // ОТРИСОВКА ИНТЕРФЕЙСА (ТОЛЬКО НАЗВАНИЕ УРОВНЯ И ЖИЗНИ, БЕЗ СТАТИСТИКИ)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.fillRect(0, 0, canvas.width, 68);
 
@@ -1013,7 +988,6 @@
         const topText = lvlCfg.action === "dodge" ? `${lvlCfg.nameTop}` : `${lvlCfg.name}`;
         ctx.fillText(topText, 15, 42);
 
-        // Жизни
         ctx.font = '24px Arial, sans-serif';
         let livesStr = "";
         for (let l = 0; l < state.lives; l++) {
@@ -1021,7 +995,6 @@
         }
         ctx.fillText(livesStr, 15, 102);
 
-        // Заставка нового уровня
         if (state.evolutionTextTimer > 0) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
             ctx.fillRect(0, 300, canvas.width, 150);
@@ -1036,7 +1009,7 @@
             ctx.textAlign = 'left'; 
         }
 
-        requestAnimationFrame(update);
+        rafId = requestAnimationFrame(update);
     }
 
     function handleScore() {
@@ -1088,6 +1061,10 @@
     }
 
     function resetGame() {
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
         state.level = 1;
         state.score = 0;
         state.lives = 3;
@@ -1108,7 +1085,7 @@
 
         updateCanvasRect();
         restartSpawnTimer();
-        requestAnimationFrame(update);
+        rafId = requestAnimationFrame(update);
     }
 
     updateCanvasRect();
