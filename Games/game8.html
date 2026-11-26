@@ -146,7 +146,6 @@
     opacity: 0.55;
   }
 
-  /* Волшебное парение волной и яркое свечение всех букетов при победе */
   .slot.magic-glow {
     opacity: 1 !important;
     cursor: default;
@@ -175,7 +174,6 @@
     }
   }
 
-  /* Волшебная пыльца (светящиеся точечки) */
   #magic-pollen-layer {
     position: fixed;
     inset: 0;
@@ -263,7 +261,7 @@
   .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 15, 30, 0.96);
+    background: rgba(10, 15, 30, 0.94);
     display: none;
     flex-direction: column;
     align-items: center;
@@ -279,6 +277,7 @@
     font-weight: 900;
     margin-bottom: 14px;
     z-index: 10;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.8);
   }
   .overlay p {
     font-size: 16px;
@@ -287,10 +286,11 @@
     max-width: 320px;
     color: #fff;
     z-index: 10;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.9);
   }
 
   .win-photo {
-    width: min(56vw, 190px);
+    width: min(54vw, 185px);
     aspect-ratio: 1;
     border-radius: 50%;
     object-fit: cover;
@@ -312,13 +312,14 @@
     z-index: 10;
   }
 
+  /* Холст пышного салюта поверх всего экрана победы */
   #fireworks-canvas {
-    position: absolute;
+    position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 12;
+    z-index: 20;
   }
 </style>
 </head>
@@ -377,7 +378,6 @@
     let isMuted = false;
     let gameSessionId = 0;
     let magicPollenTimer = null;
-    let isFinishedExit = false;
 
     const boardEl = document.getElementById('game-board');
     const statusEl = document.getElementById('status');
@@ -387,7 +387,7 @@
     const pollenLayer = document.getElementById('magic-pollen-layer');
 
     // =========================================================
-    // ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/ + СКАЗОЧНЫЙ ПЕРЕЛИВ)
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА
     // =========================================================
     const soundFiles = {
       click: '../sounds/click.mp3',
@@ -404,17 +404,17 @@
     let activeMagicNodes = [];
 
     // =========================================================
-    // ФОНОВАЯ МУЗЫКА (../music/kalambur_bukety.mp3)
+    // ФОНОВАЯ МУЗЫКА (ЗВУЧИТ ДО НАЖАТИЯ "ДАЛЬШЕ")
     // =========================================================
     const bgMusic = new Audio('../music/kalambur_bukety.mp3');
     bgMusic.loop = true;
     bgMusic.preload = 'auto';
-    const BG_MUSIC_BASE_VOLUME = 0.35;
-    bgMusic.volume = BG_MUSIC_BASE_VOLUME;
+    bgMusic.volume = 0.35;
     let bgMusicStarted = false;
+    let isExitedToQuest = false;
 
     function startBgMusic() {
-      if (isMuted || isFinishedExit) return;
+      if (isMuted || isExitedToQuest) return;
       bgMusic.muted = false;
       if (bgMusic.paused) {
         bgMusic.play().then(() => {
@@ -465,7 +465,7 @@
           } catch (e) {}
         }
       }
-      if (!isMuted && !isFinishedExit) {
+      if (!isMuted && !isExitedToQuest) {
         startBgMusic();
       }
     }
@@ -517,7 +517,6 @@
       activeMagicNodes = [];
     }
 
-    // Многослойный сказочный звук (арфа, мерцающие звёздочки, тёплый аккорд и эхо)
     function playMagicSparkleSound() {
       if (isMuted || !audioCtx) return;
       stopMagicSound();
@@ -659,7 +658,7 @@
     }
 
     // =========================================================
-    // ГЕНЕРАЦИЯ SVG БУКЕТОВ (ОРИГИНАЛЬНАЯ ГРАФИКА)
+    // ГЕНЕРАЦИЯ SVG БУКЕТОВ
     // =========================================================
     function getRoseSVG(x, y) {
       return `
@@ -726,7 +725,7 @@
     }
 
     // =========================================================
-    // РЕШАТЕЛЬ + ОЦЕНКА СЛОЖНОСТИ (СНИЖЕНИЕ СЛОЖНОСТИ НА ~20%)
+    // РЕШАТЕЛЬ + ОЦЕНКА СЛОЖНОСТИ
     // =========================================================
     function getMinMovesToSolve(typeRows) {
       const startState = typeRows.map(row => row.filter(x => x !== null));
@@ -813,9 +812,6 @@
       return -1;
     }
 
-    // =========================================================
-    // ЛОГИКА ИГРЫ (ЛЁГКАЯ РАСКЛАДКА НА 4 ПОЛКАХ: -20% СЛОЖНОСТИ)
-    // =========================================================
     function padShelf(shelf) {
       while (shelf.length < 4) shelf.push(null);
     }
@@ -944,8 +940,8 @@
         }
       });
 
-      // Плавно приглушаем фоновую музыку на время сказочного перелива, не останавливая её
-      bgMusic.volume = 0.08;
+      // Музыку НЕ останавливаем на смартфоне — она ровно играет до нажатия "Дальше"
+      if (!isMuted) startBgMusic();
       playMagicSparkleSound();
       spawnMagicPollenWave();
 
@@ -958,20 +954,249 @@
       }, 340);
     }
 
+    // =========================================================
+    // ПЫШНЫЙ МНОГОУРОВНЕВЫЙ САЛЮТ НА CANVAS (ДЛЯ ПК И ТЕЛЕФОНОВ)
+    // =========================================================
+    const fwCanvas = document.getElementById('fireworks-canvas');
+    const fwCtx = fwCanvas ? fwCanvas.getContext('2d') : null;
+    let fwParticles = [];
+    let fwRockets = [];
+    let fwAnimFrame = null;
+    let fwBurstTimer = null;
+
+    function stopFireworks() {
+      if (fwBurstTimer) {
+        clearInterval(fwBurstTimer);
+        fwBurstTimer = null;
+      }
+      if (fwAnimFrame) {
+        cancelAnimationFrame(fwAnimFrame);
+        fwAnimFrame = null;
+      }
+      fwParticles = [];
+      fwRockets = [];
+      if (fwCtx && fwCanvas) {
+        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+      }
+    }
+
+    function resizeFireworksCanvas() {
+      if (!fwCanvas) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      fwCanvas.width = window.innerWidth * dpr;
+      fwCanvas.height = window.innerHeight * dpr;
+      if (fwCtx) {
+        fwCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    window.addEventListener('resize', resizeFireworksCanvas);
+
+    function createExplosion(x, y, basePalette) {
+      const count = 64 + Math.floor(Math.random() * 24);
+      const isRing = Math.random() > 0.65;
+
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.14;
+        const speed = isRing
+          ? (3.2 + Math.random() * 1.1)
+          : (1.4 + Math.pow(Math.random(), 0.55) * 4.4);
+
+        const color = basePalette[Math.floor(Math.random() * basePalette.length)];
+        fwParticles.push({
+          x: x,
+          y: y,
+          prevX: x,
+          prevY: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          decay: 0.011 + Math.random() * 0.011,
+          color: color,
+          size: 2.0 + Math.random() * 2.2,
+          twinkle: Math.random() > 0.45
+        });
+      }
+
+      // Внутреннее золотое ядро вспышки
+      for (let j = 0; j < 20; j++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 1.8;
+        fwParticles.push({
+          x: x,
+          y: y,
+          prevX: x,
+          prevY: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          decay: 0.018 + Math.random() * 0.012,
+          color: '#fff8d6',
+          size: 1.8 + Math.random() * 1.5,
+          twinkle: true
+        });
+      }
+    }
+
+    function launchRocket() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const palettes = [
+        ['#ffe066', '#f5c518', '#ff9800', '#ffffff'],
+        ['#ff4a6a', '#ff85a1', '#ffe066', '#ffffff'],
+        ['#4a9eff', '#00f5d4', '#a8e6ff', '#ffffff'],
+        ['#c77dff', '#ff70a6', '#ffd166', '#ffffff'],
+        ['#06d6a0', '#ffe066', '#ff9f1c', '#ffffff']
+      ];
+      const palette = palettes[Math.floor(Math.random() * palettes.length)];
+
+      // Взрываем салют по всей верхней и боковым зонам экрана, чтобы не перекрывать лицо в центре
+      const sideRoll = Math.random();
+      let targetX;
+      if (sideRoll < 0.38) {
+        targetX = w * (0.12 + Math.random() * 0.22); // Левая зона
+      } else if (sideRoll < 0.76) {
+        targetX = w * (0.66 + Math.random() * 0.22); // Правая зона
+      } else {
+        targetX = w * (0.25 + Math.random() * 0.50); // Верхняя дуга
+      }
+      const targetY = h * (0.10 + Math.random() * 0.34);
+
+      fwRockets.push({
+        x: targetX + (Math.random() - 0.5) * 40,
+        y: h * 0.88,
+        prevX: targetX,
+        prevY: h * 0.88,
+        targetY: targetY,
+        vy: -(8.5 + Math.random() * 3.0),
+        vx: (Math.random() - 0.5) * 1.2,
+        color: palette[0],
+        palette: palette
+      });
+    }
+
+    function launchFireworks() {
+      if (!fwCanvas || !fwCtx) return;
+      stopFireworks();
+      resizeFireworksCanvas();
+
+      const currentSession = gameSessionId;
+
+      // Сразу запускаем первые 3 залпа для мгновенного эффекта
+      launchRocket();
+      setTimeout(() => { if (currentSession === gameSessionId && isGameOver) launchRocket(); }, 220);
+      setTimeout(() => { if (currentSession === gameSessionId && isGameOver) launchRocket(); }, 460);
+
+      // Продолжаем запускать залпы волнами каждые 700 мс, пока открыт финальный экран
+      fwBurstTimer = setInterval(() => {
+        if (currentSession !== gameSessionId || !isGameOver) {
+          stopFireworks();
+          return;
+        }
+        launchRocket();
+        if (Math.random() > 0.45) {
+          setTimeout(() => {
+            if (currentSession === gameSessionId && isGameOver) launchRocket();
+          }, 240);
+        }
+      }, 720);
+
+      function renderFireworksLoop() {
+        if (currentSession !== gameSessionId || !isGameOver) {
+          stopFireworks();
+          return;
+        }
+
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        fwCtx.globalCompositeOperation = 'destination-out';
+        fwCtx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+        fwCtx.fillRect(0, 0, w, h);
+
+        fwCtx.globalCompositeOperation = 'lighter';
+
+        // Отрисовка летящих ракет
+        for (let i = fwRockets.length - 1; i >= 0; i--) {
+          const r = fwRockets[i];
+          r.prevX = r.x;
+          r.prevY = r.y;
+          r.x += r.vx;
+          r.y += r.vy;
+          r.vy *= 0.985;
+
+          fwCtx.beginPath();
+          fwCtx.moveTo(r.prevX, r.prevY);
+          fwCtx.lineTo(r.x, r.y);
+          fwCtx.strokeStyle = r.color;
+          fwCtx.lineWidth = 2.5;
+          fwCtx.stroke();
+
+          if (r.y <= r.targetY || r.vy >= -1.8) {
+            createExplosion(r.x, r.y, r.palette);
+            fwRockets.splice(i, 1);
+          }
+        }
+
+        // Отрисовка искр и шлейфов взрыва
+        for (let i = fwParticles.length - 1; i >= 0; i--) {
+          const p = fwParticles[i];
+          p.prevX = p.x;
+          p.prevY = p.y;
+          p.vx *= 0.955;
+          p.vy *= 0.955;
+          p.vy += 0.055; // Плавная гравитация
+          p.x += p.vx;
+          p.y += p.vy;
+          p.alpha -= p.decay;
+
+          if (p.alpha <= 0.02) {
+            fwParticles.splice(i, 1);
+            continue;
+          }
+
+          const flicker = p.twinkle ? (0.65 + Math.random() * 0.35) : 1;
+          fwCtx.globalAlpha = Math.max(0, p.alpha * flicker);
+
+          // Светящийся хвост искры
+          fwCtx.beginPath();
+          fwCtx.moveTo(p.prevX, p.prevY);
+          fwCtx.lineTo(p.x, p.y);
+          fwCtx.strokeStyle = p.color;
+          fwCtx.lineWidth = p.size;
+          fwCtx.lineCap = 'round';
+          fwCtx.stroke();
+
+          // Яркая головка искры
+          fwCtx.beginPath();
+          fwCtx.arc(p.x, p.y, p.size * 0.65, 0, Math.PI * 2);
+          fwCtx.fillStyle = '#ffffff';
+          fwCtx.fill();
+        }
+
+        fwCtx.globalAlpha = 1;
+        fwAnimFrame = requestAnimationFrame(renderFireworksLoop);
+      }
+
+      fwAnimFrame = requestAnimationFrame(renderFireworksLoop);
+    }
+
+    // =========================================================
+    // ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ПРОЦЕСС
+    // =========================================================
     function initGame() {
       gameSessionId++;
-      stopFireworks();
+      isExitedToQuest = false;
       clearMagicEffects();
+      stopFireworks();
       stopAllSounds();
       winScreen.classList.remove('active');
       isGameOver = false;
-      isFinishedExit = false;
       isAnimating = false;
       selectedShelf = -1;
       selectedSlot = -1;
       statusEl.textContent = 'Собери 4 одинаковых букета на одной полке!';
       statusEl.style.color = '#4a9eff';
-      bgMusic.volume = BG_MUSIC_BASE_VOLUME;
 
       const startTypes = generateShuffledTypes();
       shelves = startTypes.map(shelfTypes =>
@@ -1006,7 +1231,7 @@
             const isRightmost = (i === itemsCount - 1);
 
             if (isGameOver) {
-              // После победы все букеты яркие, без затемнения
+              // После победы все букеты яркие
             } else if (selectedShelf === shelfIndex && selectedSlot === i) {
               slotEl.classList.add('selected');
               slotEl.addEventListener('pointerdown', (e) => {
@@ -1141,174 +1366,14 @@
         setTimeout(() => {
           if (currentSession !== gameSessionId) return;
           clearMagicEffects();
-          // Возвращаем нормальную громкость фоновой музыки на финальном экране
-          bgMusic.volume = BG_MUSIC_BASE_VOLUME;
+          playSoundHybrid('win', 0.8);
           if (!isMuted) startBgMusic();
-
-          playSoundHybrid('win', 0.75);
           winScreen.classList.add('active');
           launchFireworks();
           triggerHaptic([100, 50, 100, 50, 200]);
         }, 5000);
       }
     }
-
-    // =========================================================
-    // ПЛАВНЫЙ CANVAS-САЛЮТ ДЛЯ ТЕЛЕФОНОВ И ПК (60 FPS БЕЗ ЛАГОВ)
-    // =========================================================
-    const fwCanvas = document.getElementById('fireworks-canvas');
-    const fwCtx = fwCanvas ? fwCanvas.getContext('2d') : null;
-    let fwParticles = [];
-    let fwAnimId = null;
-    let fwBurstInterval = null;
-
-    function resizeFireworksCanvas() {
-      if (!fwCanvas) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const rect = winScreen.getBoundingClientRect();
-      fwCanvas.width = (rect.width || window.innerWidth) * dpr;
-      fwCanvas.height = (rect.height || window.innerHeight) * dpr;
-      if (fwCtx) {
-        fwCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-    }
-
-    function stopFireworks() {
-      if (fwBurstInterval) {
-        clearInterval(fwBurstInterval);
-        fwBurstInterval = null;
-      }
-      if (fwAnimId) {
-        cancelAnimationFrame(fwAnimId);
-        fwAnimId = null;
-      }
-      fwParticles = [];
-      if (fwCtx && fwCanvas) {
-        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
-      }
-    }
-
-    function spawnCanvasBurst(x, y) {
-      const colors = ['#ffe066', '#f5c518', '#ff4a6a', '#4a9eff', '#ff9e00', '#7bf1a8', '#ff99cc', '#ffffff'];
-      const mainColor = colors[Math.floor(Math.random() * colors.length)];
-      const secondColor = colors[Math.floor(Math.random() * colors.length)];
-      const count = 26;
-
-      for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.25;
-        const speed = 1.6 + Math.random() * 3.2;
-        fwParticles.push({
-          x: x,
-          y: y,
-          prevX: x,
-          prevY: y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          alpha: 1,
-          decay: 0.014 + Math.random() * 0.012,
-          size: 2.2 + Math.random() * 2.2,
-          color: i % 2 === 0 ? mainColor : secondColor
-        });
-      }
-    }
-
-    function animateFireworks() {
-      if (!fwCtx || !fwCanvas) return;
-      const width = fwCanvas.clientWidth || window.innerWidth;
-      const height = fwCanvas.clientHeight || window.innerHeight;
-
-      fwCtx.clearRect(0, 0, width, height);
-      fwCtx.globalCompositeOperation = 'lighter';
-
-      for (let i = fwParticles.length - 1; i >= 0; i--) {
-        const p = fwParticles[i];
-        p.prevX = p.x;
-        p.prevY = p.y;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vx *= 0.965;
-        p.vy *= 0.965;
-        p.vy += 0.045; // лёгкая гравитация
-        p.alpha -= p.decay;
-
-        if (p.alpha <= 0) {
-          fwParticles.splice(i, 1);
-          continue;
-        }
-
-        // Светящийся шлейф искры
-        fwCtx.save();
-        fwCtx.globalAlpha = Math.max(0, p.alpha * 0.65);
-        fwCtx.strokeStyle = p.color;
-        fwCtx.lineWidth = p.size * 0.85;
-        fwCtx.lineCap = 'round';
-        fwCtx.beginPath();
-        fwCtx.moveTo(p.prevX, p.prevY);
-        fwCtx.lineTo(p.x, p.y);
-        fwCtx.stroke();
-
-        // Яркая головка искры
-        fwCtx.globalAlpha = Math.max(0, p.alpha);
-        fwCtx.fillStyle = p.color;
-        fwCtx.beginPath();
-        fwCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        fwCtx.fill();
-        fwCtx.restore();
-      }
-
-      fwCtx.globalCompositeOperation = 'source-over';
-
-      if (fwParticles.length > 0 || fwBurstInterval) {
-        fwAnimId = requestAnimationFrame(animateFireworks);
-      } else {
-        fwAnimId = null;
-      }
-    }
-
-    function launchFireworks() {
-      stopFireworks();
-      resizeFireworksCanvas();
-
-      const currentSession = gameSessionId;
-      const width = fwCanvas.clientWidth || window.innerWidth;
-      const height = fwCanvas.clientHeight || window.innerHeight;
-
-      // Точки залпов по периметру экрана (красиво обрамляют фото и текст на любом телефоне)
-      const zones = [
-        [0.18, 0.16], [0.82, 0.18], [0.50, 0.12],
-        [0.15, 0.42], [0.85, 0.40], [0.20, 0.68],
-        [0.80, 0.66], [0.25, 0.25], [0.75, 0.28],
-        [0.16, 0.55], [0.84, 0.54], [0.50, 0.20]
-      ];
-
-      let burstIndex = 0;
-      const triggerNextBurst = () => {
-        if (currentSession !== gameSessionId || !isGameOver || isFinishedExit) {
-          stopFireworks();
-          return;
-        }
-        const [zx, zy] = zones[burstIndex % zones.length];
-        const jitterX = (Math.random() - 0.5) * 0.08;
-        const jitterY = (Math.random() - 0.5) * 0.06;
-        spawnCanvasBurst(width * (zx + jitterX), height * (zy + jitterY));
-        burstIndex++;
-      };
-
-      // Сразу запускаем первые 2 залпа без задержки
-      triggerNextBurst();
-      setTimeout(triggerNextBurst, 180);
-
-      fwAnimId = requestAnimationFrame(animateFireworks);
-
-      // Продолжаем запускать залпы, пока открыт финальный экран
-      fwBurstInterval = setInterval(triggerNextBurst, 550);
-    }
-
-    window.addEventListener('resize', () => {
-      if (winScreen.classList.contains('active')) {
-        resizeFireworksCanvas();
-      }
-    });
 
     // =========================================================
     // КНОПКИ УПРАВЛЕНИЯ
@@ -1322,7 +1387,7 @@
       if (isMuted) {
         stopMagicSound();
         pauseBgMusic();
-      } else if (!isFinishedExit) {
+      } else if (!isExitedToQuest) {
         startBgMusic();
       }
       Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
@@ -1355,9 +1420,9 @@
 
     document.getElementById('next-btn').addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      isFinishedExit = true;
-      stopFireworks();
+      isExitedToQuest = true;
       clearMagicEffects();
+      stopFireworks();
       stopAllSounds();
       pauseBgMusic();
       if (window.parent !== window) {
@@ -1368,7 +1433,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         pauseBgMusic();
-      } else if (!isMuted && !isFinishedExit && bgMusicStarted) {
+      } else if (!isMuted && !isExitedToQuest && bgMusicStarted) {
         startBgMusic();
       }
     });
