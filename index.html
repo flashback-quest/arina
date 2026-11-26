@@ -640,7 +640,7 @@ h1 {
 <body>
 <div class="space-bg" id="space-bg"></div>
 
-<audio id="bg-music" src="music/birthday.mp3" preload="none" loop></audio>
+<audio id="bg-music" src="music/birthday.mp3" preload="auto" loop></audio>
 <button id="mute-btn" class="mute-btn" title="Звук">🔊</button>
 
 <div id="quest-container">
@@ -910,18 +910,14 @@ const albumWishes = [
    ========================================================================= */
 const games = {
   totalGames: 14,
-  // Ссылка на функцию победы текущего шага
   currentOnWin: null,
-  // Ссылка на функцию прерывания текущего шага
   currentOnAbort: null
 };
 
-// Слушаем сигналы от мини-игр, открытых внутри iframe
 window.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || typeof data !== "object") return;
 
-  // Если игра прислала сигнал победы
   if (data.type === "QUEST_WIN" && typeof games.currentOnWin === "function") {
     const winCallback = games.currentOnWin;
     games.currentOnWin = null;
@@ -929,7 +925,6 @@ window.addEventListener("message", (event) => {
     winCallback();
   }
 
-  // Если игра прислала сигнал прерывания / выхода
   if (data.type === "QUEST_ABORT" && typeof games.currentOnAbort === "function") {
     const abortCallback = games.currentOnAbort;
     games.currentOnWin = null;
@@ -939,51 +934,115 @@ window.addEventListener("message", (event) => {
 });
 
 /* =========================================================================
-   3) КОНТРОЛЛЕР
+   3) УПРАВЛЕНИЕ МУЗЫКОЙ (ЕДИНАЯ ТОЧКА)
+   ========================================================================= */
+const bgMusic = document.getElementById('bg-music');
+const muteBtn = document.getElementById("mute-btn");
+let isMuted = false;
+
+function updateMuteBtn(muted) {
+  muteBtn.textContent = muted ? "🔇" : "🔊";
+}
+
+/**
+ * Должна ли музыка сейчас звучать?
+ * — Не на обложке (ждём тапа по подарку)
+ * — Не на экране мини-игры (пауза)
+ * — Не на экране прощания
+ * — Не когда вкладка в фоне
+ */
+function musicShouldPlay() {
+  if (document.hidden) return false;
+  const activeScreen = document.querySelector(".screen.active");
+  if (!activeScreen) return false;
+  const id = activeScreen.id;
+  if (id === "screen-cover") return false;
+  if (id === "screen-game") return false;
+  if (id === "screen-goodbye") return false;
+  return true;
+}
+
+/**
+ * Единственная функция, которая решает играть или пауза.
+ * Никогда не трогает currentTime.
+ */
+function syncMusic() {
+  if (musicShouldPlay()) {
+    if (bgMusic.paused) {
+      bgMusic.play().catch(() => {
+        // Автоплей заблокирован — ждём следующего касания
+      });
+    }
+  } else {
+    if (!bgMusic.paused) {
+      bgMusic.pause();
+    }
+  }
+}
+
+// Автоповтор play() при касании, если браузер заблокировал автоплей
+function retryMusicOnGesture() {
+  if (musicShouldPlay() && bgMusic.paused) {
+    bgMusic.play().catch(() => {});
+  }
+}
+document.addEventListener("pointerdown", retryMusicOnGesture, { passive: true });
+document.addEventListener("touchstart", retryMusicOnGesture, { passive: true });
+
+muteBtn.addEventListener("click", () => {
+  isMuted = !isMuted;
+  bgMusic.muted = isMuted;
+  updateMuteBtn(isMuted);
+  saveProgress(currentPhase);
+});
+
+/* =========================================================================
+   4) КОНТРОЛЛЕР
    ========================================================================= */
 let currentStepIndex = 0;
 let isArcadeMode = false;
-let isMuted = false;
-let savedMusicTime = 0;
-const bgMusic = document.getElementById('bg-music');
+let currentPhase = 'cover';
 
 window.addEventListener("DOMContentLoaded", () => {
   initMagicSparkles();
 
+  let state = null;
   try {
     const savedState = localStorage.getItem('quest_progress');
-    if (savedState) {
-      const state = JSON.parse(savedState);
-      currentStepIndex = state.stepIndex || 0;
-      isMuted = Boolean(state.isMuted);
-      
-      if (state.phase === 'final') {
-        localStorage.removeItem('quest_progress');
-        showScreen("screen-cover");
-        updateMuteBtn(true);
-        return;
-      }
-
-      if (currentStepIndex > 0 || state.phase === 'cover') {
-        updateMuteBtn(isMuted);
-        bgMusic.muted = isMuted;
-        
-        if (state.phase === 'cover') {
-          showScreen("screen-cover");
-        } else if (state.phase === 'story') {
-          goToStory(true);
-        } else {
-          goToGame();
-        }
-        return;
-      }
-    }
+    if (savedState) state = JSON.parse(savedState);
   } catch (e) {
     console.warn("Не удалось прочитать сохранение:", e);
   }
-  
+
+  if (state) {
+    currentStepIndex = state.stepIndex || 0;
+    isMuted = Boolean(state.isMuted);
+  }
+  bgMusic.muted = isMuted;
+  updateMuteBtn(isMuted);
+
+  if (state) {
+    if (state.phase === 'final') {
+      localStorage.removeItem('quest_progress');
+      currentPhase = 'cover';
+      showScreen("screen-cover");
+      return;
+    }
+    if (currentStepIndex > 0 || state.phase === 'cover') {
+      currentPhase = state.phase || 'cover';
+      if (state.phase === 'cover') {
+        showScreen("screen-cover");
+      } else if (state.phase === 'story') {
+        goToStory(true);
+      } else {
+        goToGame();
+      }
+      return;
+    }
+  }
+
+  currentPhase = 'cover';
   showScreen("screen-cover");
-  updateMuteBtn(true);
 });
 
 function initMagicSparkles() {
@@ -1017,9 +1076,9 @@ function showScreen(id) {
   if (typeof setSpacePaused === "function") {
     setSpacePaused(id === "screen-game");
   }
+  // Единая точка синхронизации музыки при любой смене экрана
+  syncMusic();
 }
-
-let currentPhase = 'cover';
 
 function saveProgress(phase) {
   if (phase) currentPhase = phase;
@@ -1034,17 +1093,21 @@ function saveProgress(phase) {
   }
 }
 
+/* --- ОБЛОЖКА: клик по подарку --- */
 document.getElementById("gift-box").addEventListener("click", () => {
+  // Запускаем музыку с самого начала в контексте user gesture,
+  // чтобы мобильный браузер не блокировал автоплей.
+  bgMusic.currentTime = 0;
+  bgMusic.muted = isMuted;
+  bgMusic.play().catch(e => console.log("Ошибка аудио:", e));
+
   const box = document.getElementById("gift-img");
   box.style.transition = "transform 0.5s, opacity 0.5s";
   box.style.transform = "scale(1.5)";
   box.style.opacity = "0";
-  
+
   setTimeout(() => {
-    bgMusic.play().catch(e => console.log("Ошибка аудио:", e));
-    updateMuteBtn(false);
-    bgMusic.muted = false;
-    isMuted = false;
+    currentPhase = 'start';
     showScreen("screen-start");
     preloadStepAssets(0);
   }, 500);
@@ -1055,6 +1118,8 @@ document.getElementById("btn-back-to-cover").addEventListener("click", () => {
   box.style.transition = "none";
   box.style.transform = "scale(1)";
   box.style.opacity = "1";
+  currentPhase = 'cover';
+  saveProgress('cover');
   showScreen("screen-cover");
 });
 
@@ -1064,7 +1129,6 @@ document.getElementById("btn-start").addEventListener("click", () => {
   goToGame();
 });
 
-// Предзагрузка фото текущего и следующего шага в кэш телефона
 function preloadStepAssets(index) {
   [index, index + 1].forEach((i) => {
     const s = questSteps[i];
@@ -1076,17 +1140,11 @@ function preloadStepAssets(index) {
 }
 
 function goToGame() {
-  // Проверяем, запущена ли 14-я призовая игра (индекс 13)
   const isBonusGame = (currentStepIndex === 13);
   const step = questSteps[currentStepIndex];
 
-  // Если это не призовая игра и шага нет в массиве — выходим в финал
   if (!isBonusGame && !step) return goToFinal();
 
-  if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
-  bgMusic.pause();
-
-  // Подставляем заголовки: свои для призовой игры или из массива для обычных
   if (isBonusGame) {
     document.getElementById("game-step-label").textContent = "Год 14";
     document.getElementById("game-task-name").textContent = "Кибер-Дрифт";
@@ -1100,14 +1158,11 @@ function goToGame() {
 
   const mountEl = document.getElementById("game-mount");
   mountEl.innerHTML = "";
-  // Растягиваем контейнер игры на всю свободную область экрана
   mountEl.style.cssText = "width:100%;height:100%;min-height:73vh;display:flex;flex-direction:column;";
 
-  // Вычисляем номер игры: для индекса 13 получится gameNumber = 14 -> Games/game14.html
   const gameNumber = currentStepIndex + 1;
   const gameUrl = `Games/game${gameNumber}.html`;
 
-  // Функция для показа красивой заглушки, если игра не найдена или сломалась
   const showFallbackError = (reasonText) => {
     mountEl.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:20px;text-align:center;">
@@ -1122,24 +1177,22 @@ function goToGame() {
     });
   };
 
-  // Защита: если шаг выходит за пределы 13 игр
   if (gameNumber < 1 || gameNumber > games.totalGames) {
     showFallbackError(`Файл ${gameUrl} не предусмотрен в списке игр.`);
     return;
   }
 
-  // Запоминаем действия при победе и при прерывании игры
   games.currentOnWin = () => {
-    mountEl.innerHTML = ""; // Выгружаем игру из памяти телефона
+    mountEl.innerHTML = "";
     if (isArcadeMode) {
-      openArcade(); // В режиме Игровой возвращаем обратно в список игр
+      openArcade();
     } else {
-      goToStory(); // В режиме квеста идем дальше по сюжету
+      goToStory();
     }
   };
 
   games.currentOnAbort = () => {
-    mountEl.innerHTML = ""; // Выгружаем игру из памяти телефона
+    mountEl.innerHTML = "";
     if (isArcadeMode) {
       openArcade();
     } else if (currentStepIndex === 0) {
@@ -1149,13 +1202,11 @@ function goToGame() {
     }
   };
 
-  // Создаём встроенное окно (iframe) для запуска отдельного HTML-файла игры
   const iframe = document.createElement("iframe");
   iframe.src = gameUrl;
   iframe.style.cssText = "width:100%;height:100%;flex:1;border:none;border-radius:0;background:transparent;display:block;";
   iframe.setAttribute("allow", "autoplay");
 
-  // Если браузер не смог загрузить файл
   iframe.onerror = () => {
     showFallbackError(`Не удалось открыть файл ${gameUrl}.`);
   };
@@ -1165,12 +1216,6 @@ function goToGame() {
 
 function goToStory(silent = false) {
   const step = questSteps[currentStepIndex];
-  if (!isMuted) {
-    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
-      bgMusic.currentTime = savedMusicTime;
-    }
-    bgMusic.play().catch(e => {});
-  }
 
   document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
   document.getElementById("story-body-text").textContent = step.storyBody;
@@ -1202,25 +1247,19 @@ function goBackFromStory() {
     showScreen("screen-start");
     return;
   }
-  
+
   currentStepIndex--;
   const step = questSteps[currentStepIndex];
   document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
   document.getElementById("story-body-text").textContent = step.storyBody;
   document.getElementById("story-author-sign").textContent = step.author;
   document.getElementById("story-img").src = "photos/" + step.img;
-  
+
   showScreen("screen-story");
   saveProgress('story');
 }
 
 function goToFinal() {
-  if (!isMuted) {
-    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
-      bgMusic.currentTime = savedMusicTime;
-    }
-    bgMusic.play().catch(e => {});
-  }
   showScreen("screen-final");
   saveProgress('final');
   startAlbumSearch();
@@ -1244,20 +1283,20 @@ document.getElementById("btn-restart").addEventListener("click", () => {
   box.style.transition = "none";
   box.style.transform = "scale(1)";
   box.style.opacity = "1";
-  showScreen("screen-cover");
-  updateMuteBtn(true);
+  // Рестарт: музыка выключается и встаёт на 0.
+  // Заиграет снова только после тапа по подарку.
   bgMusic.pause();
+  bgMusic.currentTime = 0;
+  currentPhase = 'cover';
+  showScreen("screen-cover");
 });
 
-// --- ЛОГИКА ИГРОВОЙ ---
+/* --- ЛОГИКА ИГРОВОЙ --- */
 function openArcade() {
   isArcadeMode = true;
-  if (!isMuted) bgMusic.play().catch(e => {});
-  
   const grid = document.getElementById("arcade-grid");
   grid.innerHTML = "";
 
-  // Впиши сюда свои названия строго по порядку игр (в кавычках через запятую)
   const arcadeTitles = [
     "Гендер-батл",
     "Повторяйка!",
@@ -1272,7 +1311,6 @@ function openArcade() {
     "Пятнашки",
     "Тетрис",
     "Лови и убегай",
-
   ];
 
   questSteps.forEach((step, index) => {
@@ -1290,7 +1328,7 @@ function openArcade() {
     });
     grid.appendChild(btn);
   });
-  // Добавление 14-й призовой игры (она не входит в основной квест)
+
   const bonusBtn = document.createElement("button");
   bonusBtn.className = "arcade-btn";
   bonusBtn.innerHTML = `
@@ -1298,10 +1336,11 @@ function openArcade() {
     <span class="arcade-btn-title">Кибер-Дрифт</span>
   `;
   bonusBtn.addEventListener("click", () => {
-    currentStepIndex = 13; // Индекс 13 соответствует 14-й игре (счет идет с 0)
+    currentStepIndex = 13;
     goToGame();
   });
   grid.appendChild(bonusBtn);
+
   showScreen("screen-arcade");
 }
 
@@ -1312,12 +1351,10 @@ document.getElementById("btn-arcade-back").addEventListener("click", () => {
   goToFinal();
 });
 
-// --- ЛОГИКА ВЫХОДА ---
+/* --- ЛОГИКА ВЫХОДА --- */
 document.getElementById("btn-exit").addEventListener("click", () => {
   bgMusic.pause();
-  // Пытаемся закрыть вкладку (сработает, если открыто как WebApp или через JS)
   window.close();
-  // Если браузер заблокировал закрытие, показываем красивый экран прощания
   setTimeout(() => {
     showScreen("screen-goodbye");
   }, 150);
@@ -1329,31 +1366,6 @@ document.getElementById("btn-goodbye-back").addEventListener("click", () => {
 
 document.getElementById("btn-story-next").addEventListener("click", nextAfterStory);
 document.getElementById("btn-back").addEventListener("click", goBackFromStory);
-
-const muteBtn = document.getElementById("mute-btn");
-function updateMuteBtn(muted) {
-  muteBtn.textContent = muted ? "🔇" : "🔊";
-}
-muteBtn.addEventListener("click", () => {
-  isMuted = !isMuted;
-  bgMusic.muted = isMuted;
-
-  if (isMuted) {
-    if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
-    bgMusic.pause();
-  } else {
-    const activeScreen = document.querySelector(".screen.active");
-    if (activeScreen && activeScreen.id !== "screen-game") {
-      if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
-        bgMusic.currentTime = savedMusicTime;
-      }
-      bgMusic.play().catch(e => {});
-    }
-  }
-
-  updateMuteBtn(isMuted);
-  saveProgress(currentPhase);
-});
 
 function initSwipe(zoneId, onSwipeLeft, onSwipeRight) {
   const zone = document.getElementById(zoneId);
@@ -1433,18 +1445,16 @@ function renderAlbumPhoto() {
   document.getElementById("album-counter").textContent = (albumIndex + 1) + " / " + albumPhotos.length;
 }
 
-// Перелистывание фоток в альбоме свайпом пальца
 initSwipe("polaroid-element", 
   () => document.getElementById("btn-album-next").click(), 
   () => document.getElementById("btn-album-prev").click()
 );
 
 /* =========================================================================
-   4) ГЕНЕРАЦИЯ ЗВЕЗДНОГО НЕБА И КОМЕТ (НОВЫЙ БЛОК)
+   5) ГЕНЕРАЦИЯ ЗВЕЗДНОГО НЕБА И КОМЕТ
    ========================================================================= */
 const bgLayer = document.getElementById('space-bg');
 
-// Генерация звезд
 const starCount = 46; 
 const minRadius = 20; 
 const maxRadius = 400; 
@@ -1484,7 +1494,6 @@ for (let i = 0; i < starCount; i++) {
   allStars.push({ element: star });
 }
 
-// Смена цветов
 const colorClasses = ['color-white', 'color-gold', 'color-blue', 'color-pink'];
 
 function applyColorFormula() {
@@ -1519,7 +1528,6 @@ function applyColorFormula() {
 
 applyColorFormula();
 
-// Вспышки звезд
 function triggerStarburst() {
   const count = 3 + Math.floor(Math.random() * 5); 
   const shuffled = [...allStars].sort(() => 0.5 - Math.random());
@@ -1532,7 +1540,6 @@ function triggerStarburst() {
   });
 }
 
-// Кометы
 function createComet() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -1541,19 +1548,19 @@ function createComet() {
   const direction = Math.floor(Math.random() * 4);
 
   switch(direction) {
-    case 0: // Сверху вниз
+    case 0:
       startX = Math.random() * width; startY = -100;
       endX = Math.random() * width; endY = height + 100;
       break;
-    case 1: // Снизу вверх
+    case 1:
       startX = Math.random() * width; startY = height + 100;
       endX = Math.random() * width; endY = -100;
       break;
-    case 2: // Слева направо
+    case 2:
       startX = -100; startY = Math.random() * height;
       endX = width + 100; endY = Math.random() * height;
       break;
-    case 3: // Справа налево
+    case 3:
       startX = width + 100; startY = Math.random() * height;
       endX = -100; endY = Math.random() * height;
       break;
@@ -1630,16 +1637,14 @@ function setSpacePaused(paused) {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     setSpacePaused(true);
-    if (!bgMusic.paused) bgMusic.pause();
   } else {
     const activeScreen = document.querySelector(".screen.active");
     if (activeScreen && activeScreen.id !== "screen-game") {
       setSpacePaused(false);
-      if (!isMuted && activeScreen.id !== "screen-cover") {
-        bgMusic.play().catch(() => {});
-      }
     }
   }
+  // В любом случае пересчитываем состояние музыки (в фоне — пауза, обратно — играем)
+  syncMusic();
 });
 
 setTimeout(() => setSpacePaused(false), 150);
