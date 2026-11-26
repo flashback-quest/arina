@@ -1004,7 +1004,7 @@
             if (pt.alpha <= 0) state.particles.splice(i, 1);
         }
 
-        // 6. ОТРИСОВКА ИНТЕРФЕЙСА
+        // 6. ОТРИСОВКА ИНТЕРФЕЙСА (БЕЗ СТАТИСТИКИ ПОЙМАННЫХ, ЧТОБЫ НЕ ПЕРЕКРЫВАЛАСЬ КНОПКАМИ)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.fillRect(0, 0, canvas.width, 68);
 
@@ -1012,10 +1012,6 @@
         ctx.font = '20px Arial Black, sans-serif';
         const topText = lvlCfg.action === "dodge" ? `${lvlCfg.nameTop}` : `${lvlCfg.name}`;
         ctx.fillText(topText, 15, 42);
-
-        ctx.fillStyle = '#fdcb6e';
-        const scoreText = lvlCfg.action === "dodge" ? `Увороты: ${state.score} / ${lvlCfg.targetScore}` : `Поймано: ${state.score} / ${lvlCfg.targetScore}`;
-        ctx.fillText(scoreText, canvas.width - 285, 42);
 
         // Жизни
         ctx.font = '24px Arial, sans-serif';
