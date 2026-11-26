@@ -10,9 +10,48 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Nunito:ital,wght@0,400;0,700;1,400&display=block" rel="stylesheet">
+<!-- Приоритетная предзагрузка коробки и основных шрифтов -->
+<link rel="preload" href="photos/regalo.png" as="image">
+<link rel="preload" href="fonts/caveat-v23-cyrillic_latin-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/nunito-v32-cyrillic_latin-regular.woff2" as="font" type="font/woff2" crossorigin>
+
+<style>
+@font-face {
+  font-family: 'Caveat';
+  src: url('fonts/caveat-v23-cyrillic_latin-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Caveat';
+  src: url('fonts/caveat-v23-cyrillic_latin-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('fonts/nunito-v32-cyrillic_latin-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('fonts/nunito-v32-cyrillic_latin-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('fonts/nunito-v32-cyrillic_latin-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+</style>
 
 <style>
 /* =========================================================================
@@ -91,12 +130,11 @@ html, body {
 .star::after {
   content: '';
   position: absolute;
-  inset: -70%; 
+  inset: -90%; 
   border-radius: 50%;
-  background: radial-gradient(circle, var(--star-glow) 0%, transparent 60%);
-  opacity: 0.6;
+  background: radial-gradient(circle, var(--star-glow) 0%, transparent 68%);
+  opacity: 0.65;
   z-index: -1;
-  filter: blur(3px); 
   transition: background 1.5s ease;
 }
 
@@ -315,19 +353,18 @@ h1 {
 .box-image {
   width: 100%; height: auto; display: block;
   filter: drop-shadow(0 0 5px #fff) 
-          drop-shadow(0 0 15px var(--gold)) 
-          drop-shadow(0 0 35px var(--gold)) 
-          drop-shadow(0 0 60px #ffb300); 
+          drop-shadow(0 0 18px var(--gold)); 
   transition: transform 0.2s, opacity 0.5s;
+  will-change: transform;
 }
 .box-wrapper:active .box-image { transform: scale(0.95); }
 
 .box-wrapper::before {
   content: '';
   position: absolute;
-  inset: -10%;
+  inset: -18%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, rgba(245, 190, 24, 0.1) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.55) 0%, rgba(255, 179, 0, 0.22) 45%, transparent 72%);
   z-index: -1;
   animation: pulseGlow 2s infinite alternate;
   pointer-events: none;
@@ -603,7 +640,7 @@ h1 {
 <body>
 <div class="space-bg" id="space-bg"></div>
 
-<audio id="bg-music" src="music/birthday.mp3" loop></audio>
+<audio id="bg-music" src="music/birthday.mp3" preload="none" loop></audio>
 <button id="mute-btn" class="mute-btn" title="Звук">🔊</button>
 
 <div id="quest-container">
@@ -634,7 +671,7 @@ h1 {
       </div>
 
       <div class="box-wrapper" id="gift-box">
-        <img class="box-image" src="photos/regalo.png" alt="Подарок" id="gift-img">
+        <img class="box-image" src="photos/regalo.png" alt="Подарок" id="gift-img" fetchpriority="high" decoding="sync">
         
         <div class="hint-wrapper">
           <svg class="hint-oval" viewBox="0 0 100 50">
@@ -763,7 +800,7 @@ h1 {
     <div class="content-zone">
       <div class="story-content-wrapper">
         <p class="story-text-content">С Днём рождения ещё раз! Теперь эту вкладку можно спокойно закрыть.</p>
-        <p class="author-sign">Люблю тебя! Папа ❤️</p>
+        <p class="author-sign">Люблю тебя, папа ❤️</p>
       </div>
     </div>
     <div class="footer-zone">
@@ -910,40 +947,6 @@ let isMuted = false;
 let savedMusicTime = 0;
 const bgMusic = document.getElementById('bg-music');
 
-// Сохраняем, на какой секунде стоит музыка, чтобы продолжить ровно с неё
-// после случайной перезагрузки страницы (например, телефон "уснул")
-function saveMusicTime() {
-  savedMusicTime = bgMusic.currentTime || 0;
-  try {
-    localStorage.setItem('music_time', String(savedMusicTime));
-  } catch (e) {}
-}
-
-// Ставим музыку на паузу и запоминаем точное место остановки
-function pauseMusicWithSave() {
-  if (!bgMusic.paused) saveMusicTime();
-  bgMusic.pause();
-}
-
-// Продолжаем игру плеера ровно с того места, где остановились (без перемоток назад)
-function resumeMusic() {
-  if (isMuted) return;
-  if (bgMusic.paused && savedMusicTime > 0) {
-    bgMusic.currentTime = savedMusicTime;
-  }
-  bgMusic.play().catch(e => {});
-}
-
-try {
-  const savedT = parseFloat(localStorage.getItem('music_time'));
-  if (!isNaN(savedT) && savedT > 0) savedMusicTime = savedT;
-} catch (e) {}
-
-window.addEventListener("pagehide", saveMusicTime);
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === 'hidden') saveMusicTime();
-});
-
 window.addEventListener("DOMContentLoaded", () => {
   initMagicSparkles();
 
@@ -964,20 +967,6 @@ window.addEventListener("DOMContentLoaded", () => {
       if (currentStepIndex > 0 || state.phase === 'cover') {
         updateMuteBtn(isMuted);
         bgMusic.muted = isMuted;
-        
-        // Восстанавливаем позицию музыки после "засыпания" телефона.
-        // Safari в режиме приложения не умеет продолжать звук сам,
-        // поэтому включаем его с нужной секунды при первом же касании экрана.
-        if (!isMuted && savedMusicTime > 0) {
-          const restoreMusicOnce = () => {
-            bgMusic.currentTime = savedMusicTime;
-            bgMusic.play().catch(e => {});
-            document.removeEventListener('touchstart', restoreMusicOnce);
-            document.removeEventListener('click', restoreMusicOnce);
-          };
-          document.addEventListener('touchstart', restoreMusicOnce);
-          document.addEventListener('click', restoreMusicOnce);
-        }
         
         if (state.phase === 'cover') {
           showScreen("screen-cover");
@@ -1094,7 +1083,8 @@ function goToGame() {
   // Если это не призовая игра и шага нет в массиве — выходим в финал
   if (!isBonusGame && !step) return goToFinal();
 
-  pauseMusicWithSave();
+  if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
+  bgMusic.pause();
 
   // Подставляем заголовки: свои для призовой игры или из массива для обычных
   if (isBonusGame) {
@@ -1176,7 +1166,10 @@ function goToGame() {
 function goToStory(silent = false) {
   const step = questSteps[currentStepIndex];
   if (!isMuted) {
-    resumeMusic();
+    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
+      bgMusic.currentTime = savedMusicTime;
+    }
+    bgMusic.play().catch(e => {});
   }
 
   document.getElementById("story-title").textContent = step.yearLabel + ". " + step.storyTitle;
@@ -1223,10 +1216,14 @@ function goBackFromStory() {
 
 function goToFinal() {
   if (!isMuted) {
-    resumeMusic();
+    if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
+      bgMusic.currentTime = savedMusicTime;
+    }
+    bgMusic.play().catch(e => {});
   }
   showScreen("screen-final");
   saveProgress('final');
+  startAlbumSearch();
 }
 
 document.getElementById("btn-final-back").addEventListener("click", () => {
@@ -1242,32 +1239,20 @@ document.getElementById("btn-final-back").addEventListener("click", () => {
 
 document.getElementById("btn-restart").addEventListener("click", () => {
   localStorage.removeItem('quest_progress');
-  localStorage.removeItem('music_time');
-  savedMusicTime = 0;
   currentStepIndex = 0;
-  isArcadeMode = false;
-  // Возвращаем кнопку звука в обычное состояние (не заглушена)
-  isMuted = false;
-  bgMusic.muted = false;
-  updateMuteBtn(false);
-  // Полностью останавливаем и отматываем музыку в самое начало
-  bgMusic.pause();
-  try { bgMusic.currentTime = 0; } catch (e) {}
-  // Закрываем попап альбома, если он был открыт
-  const albumPopup = document.getElementById("album-popup");
-  if (albumPopup) albumPopup.style.display = "none";
-  // Возвращаем картинку подарка в исходное состояние
   const box = document.getElementById("gift-img");
   box.style.transition = "none";
   box.style.transform = "scale(1)";
   box.style.opacity = "1";
   showScreen("screen-cover");
+  updateMuteBtn(true);
+  bgMusic.pause();
 });
 
 // --- ЛОГИКА ИГРОВОЙ ---
 function openArcade() {
   isArcadeMode = true;
-  if (!isMuted) resumeMusic();
+  if (!isMuted) bgMusic.play().catch(e => {});
   
   const grid = document.getElementById("arcade-grid");
   grid.innerHTML = "";
@@ -1329,7 +1314,7 @@ document.getElementById("btn-arcade-back").addEventListener("click", () => {
 
 // --- ЛОГИКА ВЫХОДА ---
 document.getElementById("btn-exit").addEventListener("click", () => {
-  pauseMusicWithSave();
+  bgMusic.pause();
   // Пытаемся закрыть вкладку (сработает, если открыто как WebApp или через JS)
   window.close();
   // Если браузер заблокировал закрытие, показываем красивый экран прощания
@@ -1354,11 +1339,15 @@ muteBtn.addEventListener("click", () => {
   bgMusic.muted = isMuted;
 
   if (isMuted) {
-    pauseMusicWithSave();
+    if (bgMusic.currentTime > 0) savedMusicTime = bgMusic.currentTime;
+    bgMusic.pause();
   } else {
     const activeScreen = document.querySelector(".screen.active");
     if (activeScreen && activeScreen.id !== "screen-game") {
-      resumeMusic();
+      if (savedMusicTime > 0 && Math.abs(bgMusic.currentTime - savedMusicTime) > 1) {
+        bgMusic.currentTime = savedMusicTime;
+      }
+      bgMusic.play().catch(e => {});
     }
   }
 
@@ -1390,6 +1379,7 @@ initSwipe("swipe-zone-story", () => nextAfterStory(), () => goBackFromStory());
 /* АЛЬБОМ */
 let albumPhotos = [];
 let currentPhotoIndex = 1;
+let albumSearchStarted = false;
 const probeImg = new Image();
 
 probeImg.onload = () => {
@@ -1409,7 +1399,11 @@ function findAlbumPhotos() {
   probeImg.src = `photos/collages/collage (${currentPhotoIndex}).jpg`;
 }
 
-findAlbumPhotos();
+function startAlbumSearch() {
+  if (albumSearchStarted) return;
+  albumSearchStarted = true;
+  findAlbumPhotos();
+}
 
 let albumIndex = 0;
 document.getElementById("btn-album").addEventListener("click", () => {
@@ -1648,7 +1642,7 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-setSpacePaused(false);
+setTimeout(() => setSpacePaused(false), 150);
 
 </script>
 </body>
