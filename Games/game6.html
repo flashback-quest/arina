@@ -242,8 +242,8 @@
     justify-content: center;
     margin-bottom: 10px;
     z-index: 10;
-    will-change: transform, filter;
-    filter: drop-shadow(0 0 18px rgba(255, 240, 170, 0.85)) drop-shadow(0 0 36px rgba(245, 197, 24, 0.55));
+    will-change: transform;
+    filter: drop-shadow(0 0 16px rgba(255, 240, 170, 0.85));
     animation: ghost-float 2.6s ease-in-out infinite;
   }
   .win-ghost img {
@@ -254,11 +254,9 @@
   @keyframes ghost-float {
     0%, 100% {
       transform: translateY(0) rotate(-4deg) translateZ(0);
-      filter: drop-shadow(0 0 16px rgba(255, 240, 170, 0.8)) drop-shadow(0 0 32px rgba(245, 197, 24, 0.5));
     }
     50% {
       transform: translateY(-10px) rotate(4deg) translateZ(0);
-      filter: drop-shadow(0 0 26px rgba(255, 250, 210, 1)) drop-shadow(0 0 48px rgba(245, 197, 24, 0.85));
     }
   }
 
@@ -945,22 +943,20 @@
       stopFireflies();
       const canvas = document.getElementById('fireflies-canvas');
       const ctx = canvas.getContext('2d');
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = window.innerWidth;
       const h = window.innerHeight;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      canvas.width = w;
+      canvas.height = h;
 
-      const fireflyGlowSprite = createGlowSprite(36, 'rgba(255, 250, 210, 0.95)', 'rgba(255, 224, 90, 0.42)');
-      const dustGlowSprite = createGlowSprite(8, 'rgba(255, 245, 180, 0.9)', 'rgba(255, 200, 60, 0.35)');
+      const fireflyGlowSprite = createGlowSprite(24, 'rgba(255, 250, 210, 0.95)', 'rgba(255, 224, 90, 0.42)');
+      const dustGlowSprite = createGlowSprite(6, 'rgba(255, 245, 180, 0.9)', 'rgba(255, 200, 60, 0.35)');
 
-      const COUNT = 22;
-      const MIN_SPEED = 0.45;
-      const MAX_SPEED = 2.1;
+      const COUNT = 16;
+      const MIN_SPEED = 0.8;
+      const MAX_SPEED = 2.6;
 
       const flies = [];
-      const DUST_POOL = 90;
+      const DUST_POOL = 45;
       const dustParticles = [];
 
       for (let i = 0; i < DUST_POOL; i++) {
@@ -987,9 +983,9 @@
           targetVx: nextVel.vx,
           targetVy: nextVel.vy,
           changeTimer: 40 + Math.floor(Math.random() * 140),
-          size: 1.8 + Math.random() * 2.4,
+          size: 1.8 + Math.random() * 2.2,
           phase: Math.random() * Math.PI * 2,
-          pulseSpeed: 0.02 + Math.random() * 0.03
+          pulseSpeed: 0.025 + Math.random() * 0.03
         });
       }
 
@@ -1002,21 +998,26 @@
             p.y = y;
             p.vx = vx;
             p.vy = vy;
-            p.r = 0.4 + Math.random() * 0.7;
+            p.r = 0.4 + Math.random() * 0.6;
             p.life = 1.0;
-            p.decay = 0.022 + Math.random() * 0.02;
+            p.decay = 0.025 + Math.random() * 0.02;
             break;
           }
         }
       }
 
-      function animate() {
+      let lastTime = performance.now();
+
+      function animate(now) {
+        const dt = Math.min((now - lastTime) / 16.667, 3);
+        lastTime = now;
+
         ctx.clearRect(0, 0, w, h);
         ctx.globalCompositeOperation = 'lighter';
 
         for (let i = 0; i < flies.length; i++) {
           const f = flies[i];
-          f.changeTimer--;
+          f.changeTimer -= dt;
           if (f.changeTimer <= 0) {
             const nextVel = randomTargetVelocity();
             f.targetVx = nextVel.vx;
@@ -1024,23 +1025,24 @@
             f.changeTimer = 60 + Math.floor(Math.random() * 160);
           }
 
-          f.vx += (f.targetVx - f.vx) * 0.03;
-          f.vy += (f.targetVy - f.vy) * 0.03;
-          f.vx += (Math.random() - 0.5) * 0.04;
-          f.vy += (Math.random() - 0.5) * 0.04;
+          const smooth = 1 - Math.pow(0.97, dt);
+          f.vx += (f.targetVx - f.vx) * smooth;
+          f.vy += (f.targetVy - f.vy) * smooth;
+          f.vx += (Math.random() - 0.5) * 0.04 * dt;
+          f.vy += (Math.random() - 0.5) * 0.04 * dt;
 
-          f.x += f.vx;
-          f.y += f.vy;
+          f.x += f.vx * dt;
+          f.y += f.vy * dt;
 
           if (f.x < -20) f.x = w + 20;
           if (f.x > w + 20) f.x = -20;
           if (f.y < -20) f.y = h + 20;
           if (f.y > h + 20) f.y = -20;
 
-          f.phase += f.pulseSpeed;
+          f.phase += f.pulseSpeed * dt;
           const alpha = 0.25 + 0.75 * ((Math.sin(f.phase) + 1) / 2);
 
-          if (alpha > 0.35 && Math.random() < 0.7) {
+          if (alpha > 0.4 && Math.random() < 0.45) {
             spawnDust(
               f.x + (Math.random() - 0.5) * 3,
               f.y + (Math.random() - 0.5) * 3,
@@ -1049,7 +1051,7 @@
             );
           }
 
-          const drawSize = f.size * 15;
+          const drawSize = f.size * 11;
           ctx.globalAlpha = alpha;
           ctx.drawImage(fireflyGlowSprite, f.x - drawSize / 2, f.y - drawSize / 2, drawSize, drawSize);
 
@@ -1063,16 +1065,16 @@
           const p = dustParticles[i];
           if (!p.active) continue;
 
-          p.x += p.vx;
-          p.y += p.vy;
-          p.life -= p.decay;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.life -= p.decay * dt;
 
           if (p.life <= 0) {
             p.active = false;
             continue;
           }
 
-          const dSize = p.r * 9 * p.life;
+          const dSize = p.r * 7 * p.life;
           ctx.globalAlpha = p.life * 0.85;
           ctx.drawImage(dustGlowSprite, p.x - dSize / 2, p.y - dSize / 2, dSize, dSize);
         }
@@ -1082,7 +1084,7 @@
         firefliesAnimId = requestAnimationFrame(animate);
       }
 
-      animate();
+      firefliesAnimId = requestAnimationFrame(animate);
     }
 
     buildBoardOnce();
