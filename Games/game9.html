@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Игра 9 (Конный спорт)</title>
+<title>Игра 9 (Скачки)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
   body {
@@ -21,22 +21,70 @@
   }
   
   /* Шапка */
-  .header { text-align: center; margin-bottom: 15px; flex-shrink: 0; position: relative; width: 100%; max-width: 500px; }
-  h2 { font-size: 21px; color: #f5c518; margin-bottom: 5px; line-height: 1.25; }
-  #score-display { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 1px; }
-
-  /* Кнопки управления (Пауза и Звук) */
-  .control-btn {
-    position: absolute; top: 14px; z-index: 100;
-    background: rgba(20, 28, 52, 0.85); border: 1px solid rgba(255, 255, 255, 0.25);
-    color: #fff; font-size: 20px; width: 44px; height: 44px; border-radius: 50%;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transform: translateZ(0);
-    transition: transform 0.12s ease-out;
+  .header {
+    text-align: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+    position: relative;
+    width: 100%;
+    max-width: 500px;
   }
-  .control-btn:active { transform: scale(0.92) translateZ(0); }
-  #pause-btn { left: 14px; }
-  #mute-btn { right: 14px; }
+  h2 {
+    font-size: 20px;
+    color: #f5c518;
+    margin-bottom: 10px;
+    line-height: 1.25;
+  }
+
+  /* Строка управления над игровым экраном */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 4px;
+    gap: 8px;
+  }
+
+  .bar-left, .bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 86px;
+  }
+  .bar-left { justify-content: flex-start; }
+  .bar-right { justify-content: flex-end; }
+
+  #score-display {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0.5px;
+    text-align: center;
+    flex: 1;
+  }
+
+  /* Кнопки управления (Пауза, Музыка, Топот) */
+  .control-btn {
+    background: rgba(28, 39, 69, 0.9);
+    border: 1px solid rgba(245, 197, 24, 0.45);
+    color: #fff;
+    font-size: 17px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateZ(0);
+    transition: transform 0.12s ease-out, opacity 0.2s, border-color 0.2s;
+  }
+  .control-btn:active { transform: scale(0.9) translateZ(0); }
+  .control-btn.muted-off {
+    opacity: 0.45;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
 
   /* Игровая зона */
   #game-container {
@@ -325,13 +373,19 @@
 <body>
   <div class="header">
     <h2>Помоги всаднице перепрыгнуть препятствия!</h2>
-    <div id="score-display">Очки: 0 / 70</div>
+    <div class="top-bar">
+      <div class="bar-left">
+        <button id="pause-btn" class="control-btn" title="Пауза игры">⏸️</button>
+      </div>
+      <div id="score-display">Очки: 0 / 70</div>
+      <div class="bar-right">
+        <button id="music-btn" class="control-btn" title="Пауза / запуск фоновой музыки">🎵</button>
+        <button id="hoof-btn" class="control-btn" title="Включить / выключить звук топота">🔊</button>
+      </div>
+    </div>
   </div>
 
   <div id="game-container">
-    <button id="pause-btn" class="control-btn" title="Пауза">⏸️</button>
-    <button id="mute-btn" class="control-btn" title="Включить/выключить звук">🔊</button>
-
     <div id="sky-bg"><div class="moon"></div></div>
     <div id="forest"></div>
     <div id="ground"></div>
@@ -349,7 +403,7 @@
     <div id="hit-flash"></div>
   </div>
 
-  <button class="btn" id="restart-main-btn" style="margin-top: 16px;">Начать заново</button>
+  <button class="btn" id="restart-main-btn" style="margin-top: 14px;">Начать заново</button>
 
   <!-- Экран победы -->
   <div id="win-screen">
@@ -365,7 +419,7 @@
 
   <!-- Стартовый экран -->
   <div id="start-screen">
-    <h3 style="color: #f5c518; margin-bottom: 12px; font-size: 24px;">Готовься к заезду!</h3>
+    <h3 style="color: #f5c518; margin-bottom: 12px; font-size: 24px;">Готовься к скачкам!</h3>
     <p style="color: #b8d4ff; margin-bottom: 24px; font-size: 15px; max-width: 280px;">Нажимай на экран, чтобы перепрыгивать барьеры.</p>
     <button class="btn" id="start-btn">Начать</button>
   </div>
@@ -379,7 +433,8 @@
     const hitFlash = document.getElementById('hit-flash');
     const winScreen = document.getElementById('win-screen');
     const startScreen = document.getElementById('start-screen');
-    const muteBtn = document.getElementById('mute-btn');
+    const hoofBtn = document.getElementById('hoof-btn');
+    const musicBtn = document.getElementById('music-btn');
     const pauseBtn = document.getElementById('pause-btn');
     const forestEl = document.getElementById('forest');
     const skyBg = document.getElementById('sky-bg');
@@ -388,7 +443,7 @@
     const trailSparksContainer = document.getElementById('trail-sparks');
 
     // =========================================================
-    // 1. ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/ + ФОНОВАЯ МУЗЫКА ../music/)
+    // 1. РАЗДЕЛЬНАЯ СИСТЕМА ЗВУКА (ТОПОТ И ФОНОВАЯ МУЗЫКА ОТДЕЛЬНО)
     // =========================================================
     const SOUND_PATHS = {
       hoof: '../sounds/hors.mp3',
@@ -400,7 +455,10 @@
     const audioCtx = AudioCtx ? new AudioCtx() : null;
     const soundBuffers = { hit: null, win: null };
     const isLocalFile = window.location.protocol === 'file:';
-    let isMuted = false;
+
+    let isHoofMuted = false;     // Отключает только топот копыт
+    let isMusicPaused = false;   // Ставит на паузу только фоновую музыку
+    let isExitedGame = false;    // Флаг нажатия кнопки "Дальше"
     let audioUnlocked = false;
 
     const hoofSound = new Audio(SOUND_PATHS.hoof);
@@ -408,7 +466,7 @@
     hoofSound.volume = 0.5;
     hoofSound.preload = 'auto';
 
-    // Фоновая музыка
+    // Фоновая музыка (играет до самого нажатия кнопки "Дальше")
     const bgMusic = new Audio('../music/lube_kon_5.mp3');
     bgMusic.loop = true;
     bgMusic.volume = 0.55;
@@ -416,7 +474,8 @@
     let isBgMusicStarted = false;
 
     function startBgMusic() {
-      if (isMuted || isPaused || isGameOver || isFinishing) return;
+      if (isMusicPaused || isPaused || isExitedGame) return;
+      bgMusic.muted = false;
       if (bgMusic.paused) {
         bgMusic.play().then(() => {
           isBgMusicStarted = true;
@@ -462,13 +521,12 @@
           } catch (e) {}
         }
       }
-      if (!isBgMusicStarted && !isMuted && !isPaused && !isGameOver && !isFinishing) {
+      if (!isMusicPaused && !isPaused && !isExitedGame && startScreen.style.display === 'none') {
         startBgMusic();
       }
     }
 
     function playSound(key, volume = 0.7) {
-      if (isMuted) return;
       const buf = soundBuffers[key];
       if (audioCtx && buf && !isLocalFile) {
         const playNow = () => {
@@ -501,13 +559,12 @@
         a.pause();
         a.currentTime = 0;
         a.volume = volume;
-        a.muted = isMuted;
         a.play().catch(() => {});
       } catch (e) {}
     }
 
     function playJumpTone() {
-      if (isMuted || !audioCtx) return;
+      if (!audioCtx) return;
       try {
         if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         const now = audioCtx.currentTime + 0.01;
@@ -526,7 +583,7 @@
     }
 
     function playScoreTone() {
-      if (isMuted || !audioCtx) return;
+      if (!audioCtx) return;
       try {
         if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         const now = audioCtx.currentTime + 0.01;
@@ -559,7 +616,7 @@
 
     let isGameOver = false;
     let isPaused = false;
-    let isFinishing = false; // Режим 4-секундного красивого финала
+    let isFinishing = false;
     let finishTimer = 0;
     let finishScreenShown = false;
     let horseFinishX = 0;
@@ -639,7 +696,6 @@
       }
       forestEl.appendChild(treeFrag);
 
-      // Пул золотых искр на трассе для 4-секундного финала
       const sparkFrag = document.createDocumentFragment();
       for (let i = 0; i < TRAIL_SPARK_POOL_SIZE; i++) {
         const el = document.createElement('div');
@@ -657,7 +713,6 @@
       }
       trailSparksContainer.appendChild(sparkFrag);
 
-      // Пул частиц салюта для экрана победы
       const fwFrag = document.createDocumentFragment();
       for (let i = 0; i < FIREWORK_POOL_SIZE; i++) {
         const el = document.createElement('div');
@@ -718,7 +773,6 @@
         s.vx = -35 - Math.random() * 75;
         s.vy = -30 - Math.random() * 65;
         s.life = 1.0;
-        // Долгая жизнь искр (около 1.2 - 1.8 сек), чтобы шлейф красиво тянулся
         s.decay = 0.55 + Math.random() * 0.35;
 
         s.el.style.width = size + 'px';
@@ -767,23 +821,46 @@
     }
 
     // =========================================================
-    // 4. УПРАВЛЕНИЕ И ЛОГИКА ИГРЫ
+    // 4. КНОПКИ ВЕРХНЕЙ ПАНЕЛИ И УПРАВЛЕНИЕ ИГРОЙ
     // =========================================================
-    muteBtn.addEventListener('pointerdown', (e) => {
+    // Кнопка паузы / запуска фоновой музыки
+    musicBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       unlockAudio();
-      isMuted = !isMuted;
-      muteBtn.textContent = isMuted ? '🔇' : '🔊';
-      hoofSound.muted = isMuted;
-      bgMusic.muted = isMuted;
-      Object.values(htmlAudioFallback).forEach(a => { a.muted = isMuted; });
-      if (isMuted) {
+      isMusicPaused = !isMusicPaused;
+      if (isMusicPaused) {
+        musicBtn.textContent = '🎵';
+        musicBtn.classList.add('muted-off');
         pauseBgMusic();
-      } else if (!isPaused && !isGameOver && !isFinishing) {
-        startBgMusic();
+      } else {
+        musicBtn.textContent = '🎵';
+        musicBtn.classList.remove('muted-off');
+        if (!isPaused && !isExitedGame && startScreen.style.display === 'none') {
+          startBgMusic();
+        }
       }
     });
 
+    // Кнопка отключения ТОЛЬКО топота копыт
+    hoofBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      unlockAudio();
+      isHoofMuted = !isHoofMuted;
+      hoofSound.muted = isHoofMuted;
+      if (isHoofMuted) {
+        hoofBtn.textContent = '🔇';
+        hoofBtn.classList.add('muted-off');
+        hoofSound.pause();
+      } else {
+        hoofBtn.textContent = '🔊';
+        hoofBtn.classList.remove('muted-off');
+        if (!isJumping && !isPaused && !isGameOver && startScreen.style.display === 'none') {
+          hoofSound.play().catch(() => {});
+        }
+      }
+    });
+
+    // Кнопка паузы игры
     pauseBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       if (isGameOver || isFinishing) return;
@@ -800,10 +877,12 @@
       } else {
         pauseBtn.textContent = '⏸️';
         container.classList.remove('paused');
-        if (!isJumping && !isMuted) {
+        if (!isJumping && !isHoofMuted) {
           hoofSound.play().catch(() => {});
         }
-        startBgMusic();
+        if (!isMusicPaused) {
+          startBgMusic();
+        }
         lastTime = performance.now();
         gameLoopId = requestAnimationFrame(update);
       }
@@ -825,7 +904,9 @@
       initGame();
     });
 
+    // Фоновая музыка выключается только здесь, при нажатии "Дальше"
     document.getElementById('next-btn').addEventListener('click', () => {
+      isExitedGame = true;
       stopFireworks();
       hoofSound.pause();
       pauseBgMusic();
@@ -838,8 +919,12 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         pauseBgMusic();
-      } else if (!isMuted && !isPaused && !isGameOver && !isFinishing && startScreen.style.display === 'none') {
-        startBgMusic();
+        hoofSound.pause();
+      } else if (!isExitedGame && !isPaused && startScreen.style.display === 'none') {
+        if (!isMusicPaused) startBgMusic();
+        if (!isHoofMuted && !isJumping && !isGameOver) {
+          hoofSound.play().catch(() => {});
+        }
       }
     });
 
@@ -850,8 +935,9 @@
       toast.classList.remove('show', 'finish-banner');
       toast.textContent = 'Упс! Выше прыжок!';
       pauseBtn.textContent = '⏸️';
-      pauseBtn.style.display = 'flex';
+      pauseBtn.style.visibility = 'visible';
 
+      isExitedGame = false;
       isGameOver = false;
       isPaused = false;
       isFinishing = false;
@@ -894,10 +980,11 @@
       }
 
       hoofSound.currentTime = 0;
-      if (!isMuted) {
+      hoofSound.muted = isHoofMuted;
+      if (!isHoofMuted) {
         hoofSound.play().catch(() => {});
       }
-      if (startScreen.style.display === 'none') {
+      if (startScreen.style.display === 'none' && !isMusicPaused) {
         startBgMusic();
       }
 
@@ -935,7 +1022,6 @@
       const rawDt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
 
-      // В режиме 4-секундного финала: первые 1.5 сек сильное замедление (0.28x), затем плавный выход на торжественный галоп (0.65x)
       let timeScale = 1.0;
       if (isFinishing) {
         timeScale = finishTimer < 1.5 ? 0.28 : 0.65;
@@ -947,19 +1033,16 @@
         groundEl.style.animationDuration = '0.55s';
       }
 
-      // 1. Физика прыжка и финальный 4-секундный галоп за правый край экрана
+      // 1. Физика прыжка и финальный галоп за правый край экрана
       if (isFinishing) {
         finishTimer += rawDt;
 
-        // После приземления всадница равномерно скачет вправо через весь экран (около 2.6 сек пути)
         if (!isJumping) {
           horseFinishX += 205 * rawDt;
         } else {
-          // В замедленном полёте над последним барьером тоже слегка продвигается вперёд
           horseFinishX += 35 * rawDt;
         }
 
-        // Постоянно сыпем крупные золотые искры из-под копыт и за всадницей
         sparkAccumulator += rawDt;
         if (sparkAccumulator >= 0.045) {
           sparkAccumulator = 0;
@@ -968,7 +1051,6 @@
           spawnTrailSparks(horseCenterX, horseCenterY, 3);
         }
 
-        // Финал длится ~4.2 секунды, пока лошадь красиво ускачет за правый край экрана
         if (!finishScreenShown && (horseFinishX > containerW + 60 || finishTimer >= 4.2)) {
           finishScreenShown = true;
           completeVictory();
@@ -986,7 +1068,7 @@
             jumpVelocity = 0;
             isJumping = false;
             jumpWrapper.classList.remove('jumping');
-            if (!isGameOver && !isPaused && !isMuted && hoofSound.paused) {
+            if (!isGameOver && !isPaused && !isHoofMuted && hoofSound.paused) {
               hoofSound.play().catch(() => {});
             }
           }
@@ -1125,24 +1207,21 @@
       scoreDisplay.textContent = `Очки: ${score} / ${TARGET_SCORE}`;
     }
 
-    // Старт 4-секундного замедленного финала после перепрыгивания последнего барьера
+    // Старт замедленного финала (фоновая музыка продолжает играть!)
     function startCinematicFinish() {
       if (isFinishing || isGameOver) return;
       isFinishing = true;
       finishTimer = 0;
       finishScreenShown = false;
       horseFinishX = 0;
-      pauseBtn.style.display = 'none';
-      pauseBgMusic();
+      pauseBtn.style.visibility = 'hidden';
 
       container.classList.add('slowmo');
 
-      // Сразу звучат победные фанфары и появляется баннер финиша
       playSound('win', 0.8);
       toast.textContent = 'Финиш! Великолепно! 🏆';
       toast.classList.add('show', 'finish-banner');
 
-      // Первый залп золотых искр прямо над всадницей
       spawnTrailSparks(95, 220 + playerY, 22);
 
       if (navigator.vibrate) {
@@ -1150,7 +1229,7 @@
       }
     }
 
-    // Завершение заезда и плавное открытие экрана победы
+    // Завершение заезда и открытие экрана победы (фоновая музыка продолжает играть до нажатия "Дальше"!)
     function completeVictory() {
       isGameOver = true;
       isFinishing = false;
@@ -1160,7 +1239,6 @@
       }
 
       hoofSound.pause();
-      pauseBgMusic();
       toast.classList.remove('show', 'finish-banner');
       winScreen.classList.add('active');
       launchFireworks();
