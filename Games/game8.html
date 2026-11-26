@@ -146,6 +146,7 @@
     opacity: 0.55;
   }
 
+  /* Волшебное парение волной и яркое свечение всех букетов при победе */
   .slot.magic-glow {
     opacity: 1 !important;
     cursor: default;
@@ -174,6 +175,7 @@
     }
   }
 
+  /* Волшебная пыльца (светящиеся точечки над полками) */
   #magic-pollen-layer {
     position: fixed;
     inset: 0;
@@ -261,7 +263,7 @@
   .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 15, 30, 0.94);
+    background: rgba(10, 15, 30, 0.96);
     display: none;
     flex-direction: column;
     align-items: center;
@@ -269,6 +271,7 @@
     z-index: 200;
     text-align: center;
     padding: 20px;
+    overflow: hidden;
   }
   .overlay.active { display: flex; }
   .overlay h3 {
@@ -276,8 +279,8 @@
     font-size: 28px;
     font-weight: 900;
     margin-bottom: 14px;
+    position: relative;
     z-index: 10;
-    text-shadow: 0 2px 12px rgba(0,0,0,0.8);
   }
   .overlay p {
     font-size: 16px;
@@ -285,41 +288,74 @@
     line-height: 1.5;
     max-width: 320px;
     color: #fff;
+    position: relative;
     z-index: 10;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.9);
   }
 
   .win-photo {
-    width: min(54vw, 185px);
+    width: min(56vw, 190px);
     aspect-ratio: 1;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid #f5c518;
     box-shadow: 0 0 24px rgba(245,197,24,0.45);
     margin-bottom: 18px;
+    position: relative;
     z-index: 10;
-    animation: pulse-photo 2s infinite;
+    animation: pulse-photo 2.4s ease-in-out infinite;
   }
   @keyframes pulse-photo {
     0%, 100% { transform: scale(1) translateZ(0); }
-    50% { transform: scale(1.04) translateZ(0); }
+    50% { transform: scale(1.03) translateZ(0); }
   }
 
   .win-buttons {
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
     z-index: 10;
   }
 
-  /* Холст пышного салюта поверх всего экрана победы */
-  #fireworks-canvas {
-    position: fixed;
+  /* =========================================================
+     ЛЁГКИЕ ПАДАЮЩИЕ ЛЕПЕСТКИ НА ЗАДНЕМ ПЛАНЕ (z-index: 1)
+     ========================================================= */
+  #petals-bg {
+    position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
     pointer-events: none;
-    z-index: 20;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .petal {
+    position: absolute;
+    top: -30px;
+    border-radius: 70% 10% 70% 10%;
+    opacity: 0;
+    will-change: transform, opacity;
+    animation: petal-fall var(--fall-dur, 7s) linear infinite;
+    animation-delay: var(--fall-delay, 0s);
+  }
+
+  @keyframes petal-fall {
+    0% {
+      transform: translate3d(0, -10px, 0) rotate(0deg);
+      opacity: 0;
+    }
+    12% {
+      opacity: var(--petal-opacity, 0.72);
+    }
+    50% {
+      transform: translate3d(var(--sway, 25px), 52vh, 0) rotate(180deg);
+    }
+    88% {
+      opacity: var(--petal-opacity, 0.72);
+    }
+    100% {
+      transform: translate3d(calc(var(--sway, 25px) * -0.6), 108vh, 0) rotate(360deg);
+      opacity: 0;
+    }
   }
 </style>
 </head>
@@ -342,7 +378,7 @@
   </div>
 
   <div id="win-screen" class="overlay">
-    <canvas id="fireworks-canvas"></canvas>
+    <div id="petals-bg"></div>
     <h3>Идеальные букеты! 🎉</h3>
     <img class="win-photo" src="../photos/photo8_1.jpg" alt="Год 8" onerror="this.style.display='none'">
     <p>В 8 лет ты тянулась к прекрасному. Твои первые увлечения были полны творчества и ярких красок! Расти такой же вдохновленной!</p>
@@ -385,9 +421,10 @@
     const startScreen = document.getElementById('start-screen');
     const muteBtn = document.getElementById('mute-btn');
     const pollenLayer = document.getElementById('magic-pollen-layer');
+    const petalsBg = document.getElementById('petals-bg');
 
     // =========================================================
-    // ГИБРИДНАЯ СИСТЕМА ЗВУКА
+    // ГИБРИДНАЯ СИСТЕМА ЗВУКА (../sounds/ + СКАЗОЧНЫЙ ПЕРЕЛИВ)
     // =========================================================
     const soundFiles = {
       click: '../sounds/click.mp3',
@@ -404,17 +441,17 @@
     let activeMagicNodes = [];
 
     // =========================================================
-    // ФОНОВАЯ МУЗЫКА (ЗВУЧИТ ДО НАЖАТИЯ "ДАЛЬШЕ")
+    // ФОНОВАЯ МУЗЫКА (../music/kalambur_bukety.mp3)
+    // Звучит непрерывно до нажатия на кнопку "Дальше"
     // =========================================================
     const bgMusic = new Audio('../music/kalambur_bukety.mp3');
     bgMusic.loop = true;
     bgMusic.preload = 'auto';
     bgMusic.volume = 0.35;
     let bgMusicStarted = false;
-    let isExitedToQuest = false;
 
     function startBgMusic() {
-      if (isMuted || isExitedToQuest) return;
+      if (isMuted) return;
       bgMusic.muted = false;
       if (bgMusic.paused) {
         bgMusic.play().then(() => {
@@ -465,7 +502,7 @@
           } catch (e) {}
         }
       }
-      if (!isMuted && !isExitedToQuest) {
+      if (!isMuted) {
         startBgMusic();
       }
     }
@@ -812,6 +849,9 @@
       return -1;
     }
 
+    // =========================================================
+    // ЛОГИКА ИГРЫ
+    // =========================================================
     function padShelf(shelf) {
       while (shelf.length < 4) shelf.push(null);
     }
@@ -940,8 +980,7 @@
         }
       });
 
-      // Музыку НЕ останавливаем на смартфоне — она ровно играет до нажатия "Дальше"
-      if (!isMuted) startBgMusic();
+      // Фоновая музыка НЕ ставится на паузу и продолжает звучать
       playMagicSparkleSound();
       spawnMagicPollenWave();
 
@@ -955,240 +994,54 @@
     }
 
     // =========================================================
-    // ПЫШНЫЙ МНОГОУРОВНЕВЫЙ САЛЮТ НА CANVAS (ДЛЯ ПК И ТЕЛЕФОНОВ)
+    // ЛЁГКИЙ ЛИСТОПАД ИЗ ЛЕПЕСТКОВ НА ЗАДНЕМ ПЛАНЕ (ВАРИАНТ 2)
     // =========================================================
-    const fwCanvas = document.getElementById('fireworks-canvas');
-    const fwCtx = fwCanvas ? fwCanvas.getContext('2d') : null;
-    let fwParticles = [];
-    let fwRockets = [];
-    let fwAnimFrame = null;
-    let fwBurstTimer = null;
-
-    function stopFireworks() {
-      if (fwBurstTimer) {
-        clearInterval(fwBurstTimer);
-        fwBurstTimer = null;
-      }
-      if (fwAnimFrame) {
-        cancelAnimationFrame(fwAnimFrame);
-        fwAnimFrame = null;
-      }
-      fwParticles = [];
-      fwRockets = [];
-      if (fwCtx && fwCanvas) {
-        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
-      }
-    }
-
-    function resizeFireworksCanvas() {
-      if (!fwCanvas) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      fwCanvas.width = window.innerWidth * dpr;
-      fwCanvas.height = window.innerHeight * dpr;
-      if (fwCtx) {
-        fwCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-    }
-
-    window.addEventListener('resize', resizeFireworksCanvas);
-
-    function createExplosion(x, y, basePalette) {
-      const count = 64 + Math.floor(Math.random() * 24);
-      const isRing = Math.random() > 0.65;
-
-      for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.14;
-        const speed = isRing
-          ? (3.2 + Math.random() * 1.1)
-          : (1.4 + Math.pow(Math.random(), 0.55) * 4.4);
-
-        const color = basePalette[Math.floor(Math.random() * basePalette.length)];
-        fwParticles.push({
-          x: x,
-          y: y,
-          prevX: x,
-          prevY: y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          alpha: 1,
-          decay: 0.011 + Math.random() * 0.011,
-          color: color,
-          size: 2.0 + Math.random() * 2.2,
-          twinkle: Math.random() > 0.45
-        });
-      }
-
-      // Внутреннее золотое ядро вспышки
-      for (let j = 0; j < 20; j++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 0.5 + Math.random() * 1.8;
-        fwParticles.push({
-          x: x,
-          y: y,
-          prevX: x,
-          prevY: y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          alpha: 1,
-          decay: 0.018 + Math.random() * 0.012,
-          color: '#fff8d6',
-          size: 1.8 + Math.random() * 1.5,
-          twinkle: true
-        });
-      }
-    }
-
-    function launchRocket() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const palettes = [
-        ['#ffe066', '#f5c518', '#ff9800', '#ffffff'],
-        ['#ff4a6a', '#ff85a1', '#ffe066', '#ffffff'],
-        ['#4a9eff', '#00f5d4', '#a8e6ff', '#ffffff'],
-        ['#c77dff', '#ff70a6', '#ffd166', '#ffffff'],
-        ['#06d6a0', '#ffe066', '#ff9f1c', '#ffffff']
+    function startFallingPetals() {
+      petalsBg.innerHTML = '';
+      const petalColors = [
+        'linear-gradient(135deg, #ff9ebb, #ff5c8a)',
+        'linear-gradient(135deg, #ffc2d1, #ff8fab)',
+        'linear-gradient(135deg, #ffe5ec, #ffb3c6)',
+        'linear-gradient(135deg, #ffe082, #ffca28)'
       ];
-      const palette = palettes[Math.floor(Math.random() * palettes.length)];
 
-      // Взрываем салют по всей верхней и боковым зонам экрана, чтобы не перекрывать лицо в центре
-      const sideRoll = Math.random();
-      let targetX;
-      if (sideRoll < 0.38) {
-        targetX = w * (0.12 + Math.random() * 0.22); // Левая зона
-      } else if (sideRoll < 0.76) {
-        targetX = w * (0.66 + Math.random() * 0.22); // Правая зона
-      } else {
-        targetX = w * (0.25 + Math.random() * 0.50); // Верхняя дуга
+      const totalPetals = 16;
+      for (let i = 0; i < totalPetals; i++) {
+        const petal = document.createElement('div');
+        petal.className = 'petal';
+
+        const width = 9 + Math.random() * 7;
+        const height = width * (1.25 + Math.random() * 0.35);
+        const left = 3 + Math.random() * 94;
+        const duration = (6.2 + Math.random() * 4.5).toFixed(2) + 's';
+        const delay = (-Math.random() * 8).toFixed(2) + 's';
+        const sway = ((Math.random() > 0.5 ? 1 : -1) * (18 + Math.random() * 28)).toFixed(0) + 'px';
+        const opacity = (0.45 + Math.random() * 0.35).toFixed(2);
+        const color = petalColors[i % petalColors.length];
+
+        petal.style.left = left + '%';
+        petal.style.width = width.toFixed(1) + 'px';
+        petal.style.height = height.toFixed(1) + 'px';
+        petal.style.background = color;
+        petal.style.setProperty('--fall-dur', duration);
+        petal.style.setProperty('--fall-delay', delay);
+        petal.style.setProperty('--sway', sway);
+        petal.style.setProperty('--petal-opacity', opacity);
+
+        petalsBg.appendChild(petal);
       }
-      const targetY = h * (0.10 + Math.random() * 0.34);
-
-      fwRockets.push({
-        x: targetX + (Math.random() - 0.5) * 40,
-        y: h * 0.88,
-        prevX: targetX,
-        prevY: h * 0.88,
-        targetY: targetY,
-        vy: -(8.5 + Math.random() * 3.0),
-        vx: (Math.random() - 0.5) * 1.2,
-        color: palette[0],
-        palette: palette
-      });
     }
 
-    function launchFireworks() {
-      if (!fwCanvas || !fwCtx) return;
-      stopFireworks();
-      resizeFireworksCanvas();
-
-      const currentSession = gameSessionId;
-
-      // Сразу запускаем первые 3 залпа для мгновенного эффекта
-      launchRocket();
-      setTimeout(() => { if (currentSession === gameSessionId && isGameOver) launchRocket(); }, 220);
-      setTimeout(() => { if (currentSession === gameSessionId && isGameOver) launchRocket(); }, 460);
-
-      // Продолжаем запускать залпы волнами каждые 700 мс, пока открыт финальный экран
-      fwBurstTimer = setInterval(() => {
-        if (currentSession !== gameSessionId || !isGameOver) {
-          stopFireworks();
-          return;
-        }
-        launchRocket();
-        if (Math.random() > 0.45) {
-          setTimeout(() => {
-            if (currentSession === gameSessionId && isGameOver) launchRocket();
-          }, 240);
-        }
-      }, 720);
-
-      function renderFireworksLoop() {
-        if (currentSession !== gameSessionId || !isGameOver) {
-          stopFireworks();
-          return;
-        }
-
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-
-        fwCtx.globalCompositeOperation = 'destination-out';
-        fwCtx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-        fwCtx.fillRect(0, 0, w, h);
-
-        fwCtx.globalCompositeOperation = 'lighter';
-
-        // Отрисовка летящих ракет
-        for (let i = fwRockets.length - 1; i >= 0; i--) {
-          const r = fwRockets[i];
-          r.prevX = r.x;
-          r.prevY = r.y;
-          r.x += r.vx;
-          r.y += r.vy;
-          r.vy *= 0.985;
-
-          fwCtx.beginPath();
-          fwCtx.moveTo(r.prevX, r.prevY);
-          fwCtx.lineTo(r.x, r.y);
-          fwCtx.strokeStyle = r.color;
-          fwCtx.lineWidth = 2.5;
-          fwCtx.stroke();
-
-          if (r.y <= r.targetY || r.vy >= -1.8) {
-            createExplosion(r.x, r.y, r.palette);
-            fwRockets.splice(i, 1);
-          }
-        }
-
-        // Отрисовка искр и шлейфов взрыва
-        for (let i = fwParticles.length - 1; i >= 0; i--) {
-          const p = fwParticles[i];
-          p.prevX = p.x;
-          p.prevY = p.y;
-          p.vx *= 0.955;
-          p.vy *= 0.955;
-          p.vy += 0.055; // Плавная гравитация
-          p.x += p.vx;
-          p.y += p.vy;
-          p.alpha -= p.decay;
-
-          if (p.alpha <= 0.02) {
-            fwParticles.splice(i, 1);
-            continue;
-          }
-
-          const flicker = p.twinkle ? (0.65 + Math.random() * 0.35) : 1;
-          fwCtx.globalAlpha = Math.max(0, p.alpha * flicker);
-
-          // Светящийся хвост искры
-          fwCtx.beginPath();
-          fwCtx.moveTo(p.prevX, p.prevY);
-          fwCtx.lineTo(p.x, p.y);
-          fwCtx.strokeStyle = p.color;
-          fwCtx.lineWidth = p.size;
-          fwCtx.lineCap = 'round';
-          fwCtx.stroke();
-
-          // Яркая головка искры
-          fwCtx.beginPath();
-          fwCtx.arc(p.x, p.y, p.size * 0.65, 0, Math.PI * 2);
-          fwCtx.fillStyle = '#ffffff';
-          fwCtx.fill();
-        }
-
-        fwCtx.globalAlpha = 1;
-        fwAnimFrame = requestAnimationFrame(renderFireworksLoop);
+    function clearFallingPetals() {
+      if (petalsBg) {
+        petalsBg.innerHTML = '';
       }
-
-      fwAnimFrame = requestAnimationFrame(renderFireworksLoop);
     }
 
-    // =========================================================
-    // ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ПРОЦЕСС
-    // =========================================================
     function initGame() {
       gameSessionId++;
-      isExitedToQuest = false;
       clearMagicEffects();
-      stopFireworks();
+      clearFallingPetals();
       stopAllSounds();
       winScreen.classList.remove('active');
       isGameOver = false;
@@ -1367,9 +1220,9 @@
           if (currentSession !== gameSessionId) return;
           clearMagicEffects();
           playSoundHybrid('win', 0.8);
-          if (!isMuted) startBgMusic();
           winScreen.classList.add('active');
-          launchFireworks();
+          startFallingPetals();
+          if (!isMuted) startBgMusic();
           triggerHaptic([100, 50, 100, 50, 200]);
         }, 5000);
       }
@@ -1387,7 +1240,7 @@
       if (isMuted) {
         stopMagicSound();
         pauseBgMusic();
-      } else if (!isExitedToQuest) {
+      } else {
         startBgMusic();
       }
       Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
@@ -1420,9 +1273,8 @@
 
     document.getElementById('next-btn').addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      isExitedToQuest = true;
       clearMagicEffects();
-      stopFireworks();
+      clearFallingPetals();
       stopAllSounds();
       pauseBgMusic();
       if (window.parent !== window) {
@@ -1433,7 +1285,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         pauseBgMusic();
-      } else if (!isMuted && !isExitedToQuest && bgMusicStarted) {
+      } else if (!isMuted && bgMusicStarted) {
         startBgMusic();
       }
     });
