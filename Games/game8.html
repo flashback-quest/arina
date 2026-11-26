@@ -312,25 +312,13 @@
     z-index: 10;
   }
 
-  #fireworks {
+  #fireworks-canvas {
     position: absolute;
     inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
-    overflow: hidden;
-    z-index: 1;
-  }
-  .firework-particle {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    opacity: 0;
-  }
-  .firework-particle.burst {
-    animation: firework-burst 1.4s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
-  }
-  @keyframes firework-burst {
-    0% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
-    100% { transform: translate3d(var(--dx), var(--dy), 0) scale(0.2); opacity: 0; }
+    z-index: 12;
   }
 </style>
 </head>
@@ -353,7 +341,7 @@
   </div>
 
   <div id="win-screen" class="overlay">
-    <div id="fireworks"></div>
+    <canvas id="fireworks-canvas"></canvas>
     <h3>Идеальные букеты! 🎉</h3>
     <img class="win-photo" src="../photos/photo8_1.jpg" alt="Год 8" onerror="this.style.display='none'">
     <p>В 8 лет ты тянулась к прекрасному. Твои первые увлечения были полны творчества и ярких красок! Расти такой же вдохновленной!</p>
@@ -389,6 +377,7 @@
     let isMuted = false;
     let gameSessionId = 0;
     let magicPollenTimer = null;
+    let isFinishedExit = false;
 
     const boardEl = document.getElementById('game-board');
     const statusEl = document.getElementById('status');
@@ -425,7 +414,7 @@
     let bgMusicStarted = false;
 
     function startBgMusic() {
-      if (isMuted) return;
+      if (isMuted || isFinishedExit) return;
       bgMusic.muted = false;
       if (bgMusic.paused) {
         bgMusic.play().then(() => {
@@ -476,7 +465,7 @@
           } catch (e) {}
         }
       }
-      if (!isMuted && !isGameOver) {
+      if (!isMuted && !isFinishedExit) {
         startBgMusic();
       }
     }
@@ -739,7 +728,6 @@
     // =========================================================
     // РЕШАТЕЛЬ + ОЦЕНКА СЛОЖНОСТИ (СНИЖЕНИЕ СЛОЖНОСТИ НА ~20%)
     // =========================================================
-    // Возвращает минимальное число ходов до победы (или -1, если тупик)
     function getMinMovesToSolve(typeRows) {
       const startState = typeRows.map(row => row.filter(x => x !== null));
 
@@ -832,7 +820,6 @@
       while (shelf.length < 4) shelf.push(null);
     }
 
-    // Считает количество соседних пар одинаковых букетов на полках
     function countAdjacentPairs(rows) {
       let pairs = 0;
       for (let r = 0; r < 3; r++) {
@@ -851,10 +838,6 @@
       let fallbackResult = null;
       let attempts = 0;
 
-      // Стандартная случайная раскладка решается в среднем за 11-13 ходов и почти не имеет готовых пар.
-      // Чтобы снизить сложность на ~20% на тех же 4 полках:
-      // 1) Отбираем раскладки с 2-4 соседними одинаковыми букетами уже на старте
-      // 2) Ограничиваем оптимальную длину решения диапазоном 7..10 ходов (без запутанных ловушек)
       while (attempts < 4000) {
         attempts++;
         const arr = [...pool];
@@ -961,7 +944,8 @@
         }
       });
 
-      pauseBgMusic();
+      // Плавно приглушаем фоновую музыку на время сказочного перелива, не останавливая её
+      bgMusic.volume = 0.08;
       playMagicSparkleSound();
       spawnMagicPollenWave();
 
@@ -976,10 +960,12 @@
 
     function initGame() {
       gameSessionId++;
+      stopFireworks();
       clearMagicEffects();
       stopAllSounds();
       winScreen.classList.remove('active');
       isGameOver = false;
+      isFinishedExit = false;
       isAnimating = false;
       selectedShelf = -1;
       selectedSlot = -1;
@@ -1155,7 +1141,11 @@
         setTimeout(() => {
           if (currentSession !== gameSessionId) return;
           clearMagicEffects();
-          playSoundHybrid('win', 0.8);
+          // Возвращаем нормальную громкость фоновой музыки на финальном экране
+          bgMusic.volume = BG_MUSIC_BASE_VOLUME;
+          if (!isMuted) startBgMusic();
+
+          playSoundHybrid('win', 0.75);
           winScreen.classList.add('active');
           launchFireworks();
           triggerHaptic([100, 50, 100, 50, 200]);
@@ -1164,55 +1154,161 @@
     }
 
     // =========================================================
-    // ПУЛ ЧАСТИЦ САЛЮТА
+    // ПЛАВНЫЙ CANVAS-САЛЮТ ДЛЯ ТЕЛЕФОНОВ И ПК (60 FPS БЕЗ ЛАГОВ)
     // =========================================================
-    const FIREWORK_POOL_SIZE = 90;
-    const fireworkPool = [];
-    const fireworksContainer = document.getElementById('fireworks');
+    const fwCanvas = document.getElementById('fireworks-canvas');
+    const fwCtx = fwCanvas ? fwCanvas.getContext('2d') : null;
+    let fwParticles = [];
+    let fwAnimId = null;
+    let fwBurstInterval = null;
 
-    for (let i = 0; i < FIREWORK_POOL_SIZE; i++) {
-      const p = document.createElement('div');
-      p.className = 'firework-particle';
-      fireworksContainer.appendChild(p);
-      fireworkPool.push(p);
+    function resizeFireworksCanvas() {
+      if (!fwCanvas) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = winScreen.getBoundingClientRect();
+      fwCanvas.width = (rect.width || window.innerWidth) * dpr;
+      fwCanvas.height = (rect.height || window.innerHeight) * dpr;
+      if (fwCtx) {
+        fwCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    function stopFireworks() {
+      if (fwBurstInterval) {
+        clearInterval(fwBurstInterval);
+        fwBurstInterval = null;
+      }
+      if (fwAnimId) {
+        cancelAnimationFrame(fwAnimId);
+        fwAnimId = null;
+      }
+      fwParticles = [];
+      if (fwCtx && fwCanvas) {
+        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+      }
+    }
+
+    function spawnCanvasBurst(x, y) {
+      const colors = ['#ffe066', '#f5c518', '#ff4a6a', '#4a9eff', '#ff9e00', '#7bf1a8', '#ff99cc', '#ffffff'];
+      const mainColor = colors[Math.floor(Math.random() * colors.length)];
+      const secondColor = colors[Math.floor(Math.random() * colors.length)];
+      const count = 26;
+
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.25;
+        const speed = 1.6 + Math.random() * 3.2;
+        fwParticles.push({
+          x: x,
+          y: y,
+          prevX: x,
+          prevY: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          decay: 0.014 + Math.random() * 0.012,
+          size: 2.2 + Math.random() * 2.2,
+          color: i % 2 === 0 ? mainColor : secondColor
+        });
+      }
+    }
+
+    function animateFireworks() {
+      if (!fwCtx || !fwCanvas) return;
+      const width = fwCanvas.clientWidth || window.innerWidth;
+      const height = fwCanvas.clientHeight || window.innerHeight;
+
+      fwCtx.clearRect(0, 0, width, height);
+      fwCtx.globalCompositeOperation = 'lighter';
+
+      for (let i = fwParticles.length - 1; i >= 0; i--) {
+        const p = fwParticles[i];
+        p.prevX = p.x;
+        p.prevY = p.y;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.965;
+        p.vy *= 0.965;
+        p.vy += 0.045; // лёгкая гравитация
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          fwParticles.splice(i, 1);
+          continue;
+        }
+
+        // Светящийся шлейф искры
+        fwCtx.save();
+        fwCtx.globalAlpha = Math.max(0, p.alpha * 0.65);
+        fwCtx.strokeStyle = p.color;
+        fwCtx.lineWidth = p.size * 0.85;
+        fwCtx.lineCap = 'round';
+        fwCtx.beginPath();
+        fwCtx.moveTo(p.prevX, p.prevY);
+        fwCtx.lineTo(p.x, p.y);
+        fwCtx.stroke();
+
+        // Яркая головка искры
+        fwCtx.globalAlpha = Math.max(0, p.alpha);
+        fwCtx.fillStyle = p.color;
+        fwCtx.beginPath();
+        fwCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        fwCtx.fill();
+        fwCtx.restore();
+      }
+
+      fwCtx.globalCompositeOperation = 'source-over';
+
+      if (fwParticles.length > 0 || fwBurstInterval) {
+        fwAnimId = requestAnimationFrame(animateFireworks);
+      } else {
+        fwAnimId = null;
+      }
     }
 
     function launchFireworks() {
-      const colors = ['#f5c518', '#ff4a6a', '#4a9eff', '#ff9800', '#aaffb0', '#ff99cc', '#ffffff'];
-      let poolIdx = 0;
+      stopFireworks();
+      resizeFireworksCanvas();
+
       const currentSession = gameSessionId;
+      const width = fwCanvas.clientWidth || window.innerWidth;
+      const height = fwCanvas.clientHeight || window.innerHeight;
 
-      for (let b = 0; b < 12; b++) {
-        setTimeout(() => {
-          if (currentSession !== gameSessionId || !isGameOver) return;
-          const burstX = 12 + Math.random() * 76;
-          const burstY = 12 + Math.random() * 76;
-          const particleCount = 12;
+      // Точки залпов по периметру экрана (красиво обрамляют фото и текст на любом телефоне)
+      const zones = [
+        [0.18, 0.16], [0.82, 0.18], [0.50, 0.12],
+        [0.15, 0.42], [0.85, 0.40], [0.20, 0.68],
+        [0.80, 0.66], [0.25, 0.25], [0.75, 0.28],
+        [0.16, 0.55], [0.84, 0.54], [0.50, 0.20]
+      ];
 
-          for (let i = 0; i < particleCount; i++) {
-            const particle = fireworkPool[poolIdx % FIREWORK_POOL_SIZE];
-            poolIdx++;
+      let burstIndex = 0;
+      const triggerNextBurst = () => {
+        if (currentSession !== gameSessionId || !isGameOver || isFinishedExit) {
+          stopFireworks();
+          return;
+        }
+        const [zx, zy] = zones[burstIndex % zones.length];
+        const jitterX = (Math.random() - 0.5) * 0.08;
+        const jitterY = (Math.random() - 0.5) * 0.06;
+        spawnCanvasBurst(width * (zx + jitterX), height * (zy + jitterY));
+        burstIndex++;
+      };
 
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5;
-            const distance = 50 + Math.random() * 110;
-            const size = 4 + Math.random() * 5;
+      // Сразу запускаем первые 2 залпа без задержки
+      triggerNextBurst();
+      setTimeout(triggerNextBurst, 180);
 
-            particle.classList.remove('burst');
-            particle.style.left = burstX + '%';
-            particle.style.top = burstY + '%';
-            particle.style.background = color;
-            particle.style.width = size + 'px';
-            particle.style.height = size + 'px';
-            particle.style.setProperty('--dx', Math.cos(angle) * distance + 'px');
-            particle.style.setProperty('--dy', Math.sin(angle) * distance + 'px');
+      fwAnimId = requestAnimationFrame(animateFireworks);
 
-            void particle.offsetWidth;
-            particle.classList.add('burst');
-          }
-        }, b * 220);
-      }
+      // Продолжаем запускать залпы, пока открыт финальный экран
+      fwBurstInterval = setInterval(triggerNextBurst, 550);
     }
+
+    window.addEventListener('resize', () => {
+      if (winScreen.classList.contains('active')) {
+        resizeFireworksCanvas();
+      }
+    });
 
     // =========================================================
     // КНОПКИ УПРАВЛЕНИЯ
@@ -1226,7 +1322,7 @@
       if (isMuted) {
         stopMagicSound();
         pauseBgMusic();
-      } else if (!isGameOver) {
+      } else if (!isFinishedExit) {
         startBgMusic();
       }
       Object.values(htmlAudioPool).forEach(a => { a.muted = isMuted; });
@@ -1259,6 +1355,8 @@
 
     document.getElementById('next-btn').addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      isFinishedExit = true;
+      stopFireworks();
       clearMagicEffects();
       stopAllSounds();
       pauseBgMusic();
@@ -1270,7 +1368,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         pauseBgMusic();
-      } else if (!isMuted && !isGameOver && bgMusicStarted) {
+      } else if (!isMuted && !isFinishedExit && bgMusicStarted) {
         startBgMusic();
       }
     });
